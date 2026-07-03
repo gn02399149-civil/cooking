@@ -52,6 +52,36 @@
             color: #2d3748;
         }
 
+        .nav-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .btn-nav {
+            padding: 6px 14px;
+            background-color: #fff;
+            border: 1px solid #cbd5e0;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            font-weight: bold;
+            color: #4a5568;
+            transition: all 0.2s;
+        }
+
+        .btn-nav:hover {
+            background-color: #edf2f7;
+            border-color: #a0aec0;
+        }
+
+        .current-range-display {
+            font-size: 1rem;
+            font-weight: bold;
+            color: #2d3748;
+        }
+
         .summary-panel {
             background-color: #ebf8ff;
             border: 1px solid #bee3f8;
@@ -275,15 +305,25 @@
             background-color: #ebf8ff;
         }
 
-        .dish-item .edit-icon {
-            cursor: pointer;
-            color: #a0aec0;
-            font-size: 0.8rem;
-            padding: 2px 4px;
+        .dish-item .action-icons {
+            display: flex;
+            gap: 8px;
         }
 
-        .dish-item .edit-icon:hover {
+        .dish-item .action-btn {
+            cursor: pointer;
+            color: #a0aec0;
+            font-size: 0.85rem;
+            padding: 2px 4px;
+            transition: color 0.2s;
+        }
+
+        .dish-item .action-btn.edit:hover {
             color: #3182ce;
+        }
+
+        .dish-item .action-btn.delete:hover {
+            color: #e53e3e;
         }
 
         .method-panel {
@@ -379,9 +419,16 @@
 
     <div class="main-content">
         <header>
-            <h1>半個月烹飪排程系統</h1>
-            <span style="color: #718096; font-size: 0.85rem;">提示：輸入材料如「豬肉150g, 雞蛋2顆」，系統會自動識別並加總。</span>
+            <h1>烹飪排程與量化備料系統</h1>
+            <span style="color: #718096; font-size: 0.85rem;">提示：直接拖曳菜色到排程中，系統會自動同步至雲端。</span>
         </header>
+
+        <div class="nav-controls">
+            <button class="btn-nav" onclick="changeWeek(-14)">◀ 上雙週</button>
+            <button class="btn-nav" onclick="goToday()">今天</button>
+            <button class="btn-nav" onclick="changeWeek(14)">下雙週 ▶</button>
+            <span class="current-range-display" id="currentRangeDisplay">載入中...</span>
+        </div>
 
         <div class="summary-panel" id="summaryPanel">
             <div class="summary-title" id="summaryTitle">備料清單總計</div>
@@ -454,6 +501,9 @@
         let menuSchedule = {};
         let currentFilter = '全部';
         let selectedDateKey = null;
+        
+        // 排程起始錨定點日期（預設為今天）
+        let calendarAnchorDate = new Date();
 
         function updateSyncStatus(status, text) {
             let bar = document.getElementById('syncStatusBar');
@@ -492,23 +542,21 @@
                 }
 
                 renderDishList();
-                renderCalendar();
-                selectedDateKey = "7/3";
-                updateIngredientsSummary(selectedDateKey);
+                initCalendarView();
                 updateSyncStatus('success', '✅ 雲端資料載入完成！');
             } catch (error) {
                 console.error(error);
-                updateSyncStatus('error', '❌ 無法連線至雲端資料庫，請檢查 API 網址。');
+                updateSyncStatus('error', '❌ 無法連線至雲端資料庫，請確認您的 GAS 部署設定。');
             }
         }
 
         async function saveCloudData() {
             updateSyncStatus('loading', '💾 正在同步更新至 Google 雲端...');
             try {
-                await fetch(GAS_API_URL, {
+                // 移除 no-cors，改用標準不透明傳輸或處理好跨網域的標準 POST 請求
+                const response = await fetch(GAS_API_URL, {
                     method: 'POST',
-                    mode: 'no-cors',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/text' }, // 用文字載體包裹避開特定預檢限制
                     body: JSON.stringify({
                         action: 'saveAll',
                         dishes: dishDatabase,
@@ -520,6 +568,24 @@
                 console.error(error);
                 updateSyncStatus('error', '❌ 儲存至雲端失敗。');
             }
+        }
+
+        // 格式化日期格式為 2026-07-03 的 key 結構，確保年度變更時資料不會錯亂
+        function formatDateKey(dateObj) {
+            const y = dateObj.getFullYear();
+            const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const d = String(dateObj.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+
+        // 針對舊系統簡易標記格式 (M/D) 的相容舊資料機制
+        function getScheduleData(dateKey, legacyKey) {
+            if (menuSchedule[dateKey]) return menuSchedule[dateKey];
+            if (menuSchedule[legacyKey]) {
+                menuSchedule[dateKey] = menuSchedule[legacyKey]; // 自動升級舊格式
+                return menuSchedule[dateKey];
+            }
+            return null;
         }
 
         function parseAndAggregateIngredients(ingredientsArray) {
@@ -554,15 +620,17 @@
             return resultStrings;
         }
 
-        function updateIngredientsSummary(dateKey) {
+        function updateIngredientsSummary(dateKey, legacyKey) {
             const panel = document.getElementById('summaryPanel');
             const title = document.getElementById('summaryTitle');
             const listContainer = document.getElementById('ingredientsList');
             
-            title.innerText = `📊 ${dateKey} 備料清單與食材量化加總`;
+            // 介面展示用名稱
+            const displayDate = dateKey.substring(5).replace('-', '/');
+            title.innerText = `📊 ${displayDate} 備料清單與食材量化加總`;
             listContainer.innerHTML = '';
 
-            const dayMeals = menuSchedule[dateKey];
+            const dayMeals = getScheduleData(dateKey, legacyKey);
             let allIngredients = [];
             let hasFood = false;
 
@@ -611,12 +679,44 @@
                 item.className = 'dish-item';
                 item.setAttribute('draggable', 'true');
                 item.innerHTML = `
-                    <span onclick="showCookingMethod(${dish.id})">${dish.name}</span>
-                    <span class="edit-icon" onclick="editDish(${dish.id})">✏️</span>
+                    <span onclick="showCookingMethod(${dish.id})" style="flex-grow: 1; cursor: pointer;">${dish.name}</span>
+                    <div class="action-icons">
+                        <span class="action-btn edit" onclick="editDish(${dish.id})" title="編輯">✏️</span>
+                        <span class="action-btn delete" onclick="deleteDishFromDatabase(${dish.id})" title="刪除">🗑️</span>
+                    </div>
                 `;
                 item.ondragstart = (e) => { e.dataTransfer.setData('text/plain', dish.id); };
                 container.appendChild(item);
             });
+        }
+
+        async function deleteDishFromDatabase(id) {
+            const dish = dishDatabase.find(d => d.id === id);
+            if (!dish) return;
+
+            if (confirm(`確定要從菜色庫中刪除「${dish.name}」嗎？\n這將會同步移除日曆中所有已排定此菜色的行程！`)) {
+                dishDatabase = dishDatabase.filter(d => d.id !== id);
+
+                for (let dateKey in menuSchedule) {
+                    for (let mealType in menuSchedule[dateKey]) {
+                        if (Array.isArray(menuSchedule[dateKey][mealType])) {
+                            menuSchedule[dateKey][mealType] = menuSchedule[dateKey][mealType].filter(dishId => dishId !== id);
+                        }
+                    }
+                }
+
+                const editId = document.getElementById('editDishId').value;
+                if (editId == id) clearForm();
+
+                const methodPanel = document.getElementById('methodPanel');
+                if (methodPanel.style.display === 'block') methodPanel.style.display = 'none';
+
+                renderDishList();
+                renderCalendar();
+                if (selectedDateKey) updateIngredientsSummary(selectedDateKey);
+                
+                await saveCloudData();
+            }
         }
 
         function filterDishes(tag, button) {
@@ -693,30 +793,53 @@
             document.getElementById('btnCancel').style.display = "none";
         }
 
+        // 時間導航控制
+        function changeWeek(daysOffset) {
+            calendarAnchorDate.setDate(calendarAnchorDate.getDate() + daysOffset);
+            renderCalendar();
+        }
+
+        function goToday() {
+            calendarAnchorDate = new Date();
+            initCalendarView();
+        }
+
+        function initCalendarView() {
+            const today = new Date();
+            selectedDateKey = formatDateKey(today);
+            renderCalendar();
+            updateIngredientsSummary(selectedDateKey, `${today.getMonth()+1}/${today.getDate()}`);
+        }
+
         function renderCalendar() {
             const grid = document.getElementById('calendarGrid');
             grid.innerHTML = '';
             
-            const startDate = new Date(2026, 6, 3); 
-            const startDayOfWeek = startDate.getDay();
-            const currentDayOfWeekIdx = startDayOfWeek === 0 ? 7 : startDayOfWeek;
+            // 計算目前雙週顯示的起始星期一
+            const startDate = new Date(calendarAnchorDate);
+            const currentDay = startDate.getDay();
+            const diffToMonday = currentDay === 0 ? -6 : 1 - currentDay; 
+            startDate.setDate(startDate.getDate() + diffToMonday);
             
-            for (let i = 1; i < currentDayOfWeekIdx; i++) {
-                const emptyCard = document.createElement('div');
-                emptyCard.className = 'day-card empty';
-                grid.appendChild(emptyCard);
-            }
+            const endDate = new Date(startDate);
+            endDate.setDate(startDate.getDate() + 13);
+            
+            // 更新畫面上目前顯示的時間範圍文字
+            document.getElementById('currentRangeDisplay').innerText = 
+                `📅 目前區間：${startDate.getFullYear()}/${startDate.getMonth()+1}/${startDate.getDate()} ～ ${endDate.getMonth()+1}/${endDate.getDate()}`;
 
             const mealTypes = ['早餐', '中餐', '晚餐', '宵夜', '點心'];
+            const todayStr = formatDateKey(new Date());
 
-            for (let i = 0; i < 15; i++) {
+            // 連續算 14 天
+            for (let i = 0; i < 14; i++) {
                 const targetDate = new Date(startDate);
                 targetDate.setDate(startDate.getDate() + i);
-                const month = targetDate.getMonth() + 1;
-                const date = targetDate.getDate();
-                const dateKey = `${month}/${date}`;
                 
-                const isToday = i === 0 ? 'today' : '';
+                const dateKey = formatDateKey(targetDate);
+                const legacyKey = `${targetDate.getMonth() + 1}/${targetDate.getDate()}`;
+                
+                const isToday = dateKey === todayStr ? 'today' : '';
                 const card = document.createElement('div');
                 card.className = `day-card ${isToday}`;
                 if(dateKey === selectedDateKey) card.classList.add('active-select');
@@ -725,14 +848,20 @@
                     selectedDateKey = dateKey;
                     document.querySelectorAll('.day-card').forEach(c => c.classList.remove('active-select'));
                     card.classList.add('active-select');
-                    updateIngredientsSummary(dateKey);
+                    updateIngredientsSummary(dateKey, legacyKey);
                 };
 
-                let todayBadge = i === 0 ? '<span class="badge">今天</span>' : '';
-                card.innerHTML = `<div class="day-title"><span>${dateKey}</span>${todayBadge}</div>`;
+                let todayBadge = dateKey === todayStr ? '<span class="badge">今天</span>' : '';
+                card.innerHTML = `<div class="day-title"><span>${targetDate.getMonth()+1}/${targetDate.getDate()}</span>${todayBadge}</div>`;
                 
+                // 初始化該日期的結構結構
                 if (!menuSchedule[dateKey]) {
-                    menuSchedule[dateKey] = { 早餐: [], 中餐: [], 晚餐: [], 宵夜: [], 點心: [] };
+                    // 若有舊資料結構，予以繼承，否則建全新物件
+                    if(menuSchedule[legacyKey]) {
+                        menuSchedule[dateKey] = menuSchedule[legacyKey];
+                    } else {
+                        menuSchedule[dateKey] = { 早餐: [], 中餐: [], 晚餐: [], 宵夜: [], 點心: [] };
+                    }
                 }
 
                 mealTypes.forEach(mealType => {
@@ -750,7 +879,7 @@
                         if (!menuSchedule[dateKey][mealType].includes(dishId)) {
                             menuSchedule[dateKey][mealType].push(dishId);
                             renderCalendar();
-                            if (dateKey === selectedDateKey) updateIngredientsSummary(dateKey);
+                            if (dateKey === selectedDateKey) updateIngredientsSummary(dateKey, legacyKey);
                             await saveCloudData(); 
                         }
                     };
@@ -775,10 +904,12 @@
         }
 
         async function removeDishFromSchedule(dateKey, mealType, dishId) {
-            menuSchedule[dateKey][mealType] = menuSchedule[dateKey][mealType].filter(id => id !== dishId);
-            renderCalendar();
-            if (dateKey === selectedDateKey) updateIngredientsSummary(dateKey);
-            await saveCloudData(); 
+            if(menuSchedule[dateKey] && menuSchedule[dateKey][mealType]) {
+                menuSchedule[dateKey][mealType] = menuSchedule[dateKey][mealType].filter(id => id !== dishId);
+                renderCalendar();
+                if (dateKey === selectedDateKey) updateIngredientsSummary(dateKey, `${parseInt(dateKey.split('-')[1])}/${parseInt(dateKey.split('-')[2])}`);
+                await saveCloudData(); 
+            }
         }
 
         window.onload = () => {
