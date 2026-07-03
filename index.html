@@ -413,6 +413,36 @@
             cursor: pointer;
             display: none;
         }
+
+        /* ✨ 新增：食材動態輸入列樣式 */
+        .ingredient-edit-row {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 6px;
+            align-items: center;
+        }
+        .ingredient-edit-row input {
+            padding: 6px 8px !important;
+            border: 1px solid #cbd5e0;
+            border-radius: 4px;
+            font-size: 0.85rem !important;
+        }
+        .ing-name { flex: 2; width: 0; }
+        .ing-qty { flex: 1; width: 0; }
+        .ing-unit { flex: 1; width: 0; }
+        .ing-del-btn {
+            background: none;
+            border: none;
+            color: #e53e3e;
+            cursor: pointer;
+            font-size: 1.2rem;
+            padding: 0 4px;
+            line-height: 1;
+            font-weight: bold;
+        }
+        .ing-del-btn:hover {
+            color: #c53030;
+        }
     </style>
 </head>
 <body>
@@ -481,10 +511,20 @@
                     <label class="checkbox-label"><input type="checkbox" name="tags" value="點心"> 點心</label>
                 </div>
             </div>
+            
+            <!-- ✨ 修改：改為結構化食材單獨輸入面板 -->
             <div class="form-group">
-                <label for="dishIngredients">所需材料與量化 (用逗號隔開)</label>
-                <input type="text" id="dishIngredients" placeholder="例如：白飯300g, 豬肉絲100g, 雞蛋2顆">
+                <label style="margin-bottom: 6px;">所需材料與量化</label>
+                <div style="display: flex; gap: 4px; font-size: 0.75rem; color: #718096; font-weight: bold; margin-bottom: 4px; padding-left: 2px;">
+                    <span style="flex: 2;">種類品項</span>
+                    <span style="flex: 1;">數量</span>
+                    <span style="flex: 1;">單位</span>
+                    <span style="width: 20px;"></span>
+                </div>
+                <div id="ingredientRowContainer"></div>
+                <button type="button" class="btn-nav" style="width: 100%; margin-top: 4px; margin-bottom: 10px; border-style: dashed; padding: 5px; font-size: 0.8rem;" onclick="addIngredientRow()">＋ 新增食材項目</button>
             </div>
+
             <div class="form-group">
                 <label for="dishMethod">烹飪手法說明</label>
                 <textarea id="dishMethod" rows="3" placeholder="請描述配方與煮法..."></textarea>
@@ -524,66 +564,64 @@
             bar.style.display = 'block';
         }
 
-async function loadCloudData() {
-    updateSyncStatus('loading', '⏳ 正在自 Google 試算表下載備料排程...');
-    try {
-        // ✨【關鍵修正】在網址後方加上隨機時間戳記（_t），徹底逼迫瀏覽器每次重整都去撈全新的雲端資料，不使用舊快取
-        const response = await fetch(`${GAS_API_URL}?action=getData&_t=${Date.now()}`);
-        const data = await response.json();
-        
-        // 檢查後端是否有拋出錯誤
-        if (data.status === 'error') {
-            throw new Error(data.error || '後端讀取失敗');
-        }
-        
-        dishDatabase = data.dishes || [];
-        menuSchedule = data.schedule || {};
-        
-        if (dishDatabase.length === 0) {
-            dishDatabase = [
-                { id: 1, name: "肉絲炒飯", tags: ["中餐", "晚餐"], ingredients: ["白飯300g", "豬肉絲120g", "雞蛋2顆", "蔥20g"], method: "大火熱油炒香肉絲，下蛋液與白飯快速翻炒。" },
-                { id: 2, name: "火腿蛋餅", tags: ["早餐", "宵夜"], ingredients: ["蛋餅皮1張", "雞蛋1顆", "火腿片1片"], method: "中火將餅皮煎至兩面微黃，倒入蛋液蓋上餅皮。" }
-            ];
-            await saveCloudData();
-        }
+        async function loadCloudData() {
+            updateSyncStatus('loading', '⏳ 正在自 Google 試算表下載備料排程...');
+            try {
+                const response = await fetch(`${GAS_API_URL}?action=getData&_t=${Date.now()}`);
+                const data = await response.json();
+                
+                if (data.status === 'error') {
+                    throw new Error(data.error || '後端讀取失敗');
+                }
+                
+                dishDatabase = data.dishes || [];
+                menuSchedule = data.schedule || {};
+                
+                if (dishDatabase.length === 0) {
+                    dishDatabase = [
+                        { id: 1, name: "肉絲炒飯", tags: ["中餐", "晚餐"], ingredients: ["白飯300g", "豬肉絲120g", "雞蛋2顆", "蔥20g"], method: "大火熱油炒香肉絲，下蛋液與白飯快速翻炒。" },
+                        { id: 2, name: "火腿蛋餅", tags: ["早餐", "宵夜"], ingredients: ["蛋餅皮1張", "雞蛋1顆", "火腿片1片"], method: "中火將餅皮煎至兩面微黃，倒入蛋液蓋上餅皮。" }
+                    ];
+                    await saveCloudData();
+                }
 
-        renderDishList();
-        initCalendarView();
-        updateSyncStatus('success', '✅ 雲端資料載入完成！');
-    } catch (error) {
-        console.error(error);
-        updateSyncStatus('error', '❌ 無法載入雲端資料：' + error.message);
-    }
-}
+                renderDishList();
+                initCalendarView();
+                updateSyncStatus('success', '✅ 雲端資料載入完成！');
+            } catch (error) {
+                console.error(error);
+                updateSyncStatus('error', '❌ 無法載入雲端資料：' + error.message);
+            }
+        }
 
         async function saveCloudData() {
-    updateSyncStatus('loading', '💾 正在同步更新至 Google 雲端...');
-    try {
-        const payload = JSON.stringify({
-            action: 'saveAll',
-            dishes: dishDatabase,
-            schedule: menuSchedule
-        });
+            updateSyncStatus('loading', '💾 正在同步更新至 Google 雲端...');
+            try {
+                const payload = JSON.stringify({
+                    action: 'saveAll',
+                    dishes: dishDatabase,
+                    schedule: menuSchedule
+                });
 
-        // ✨ 改用 text/plain 傳送乾淨的 JSON，完美避開 CORS 預檢與字元解碼錯誤問題
-        const response = await fetch(GAS_API_URL, {
-            method: 'POST',
-            mode: 'cors', 
-            headers: { 'Content-Type': 'text/plain' },
-            body: payload
-        });
-        
-        const result = await response.json();
-        if (result && result.status === 'success') {
-            updateSyncStatus('success', '✅ 備料排程已安全存入雲端！');
-        } else {
-            updateSyncStatus('error', '❌ 雲端回報儲存失敗：' + (result.message || '未知錯誤'));
+                const response = await fetch(GAS_API_URL, {
+                    method: 'POST',
+                    mode: 'cors', 
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: payload
+                });
+                
+                const result = await response.json();
+                if (result && result.status === 'success') {
+                    updateSyncStatus('success', '✅ 備料排程已安全存入雲端！');
+                } else {
+                    updateSyncStatus('error', '❌ 雲端回報儲存失敗：' + (result.message || '未知錯誤'));
+                }
+            } catch (error) {
+                console.error(error);
+                updateSyncStatus('error', '❌ 儲存至雲端失敗，請確認 GAS 專案是否已發布為新版本並設定為「任何人」皆可存取。');
+            }
         }
-    } catch (error) {
-        console.error(error);
-        updateSyncStatus('error', '❌ 儲存至雲端失敗，請確認 GAS 專案是否已發布為新版本並設定為「任何人」皆可存取。');
-    }
-}
+
         function formatDateKey(dateObj) {
             const y = dateObj.getFullYear();
             const m = String(dateObj.getMonth() + 1).padStart(2, '0');
@@ -745,6 +783,21 @@ async function loadCloudData() {
             document.getElementById('methodContent').innerText = `【材料】\n${dish.ingredients.join('\n')}\n\n【做法】\n${dish.method || "暫無說明。"}`;
         }
 
+        /* ✨ 新增：動態生成一列食材輸入框的函式 */
+        function addIngredientRow(name = "", qty = "", unit = "") {
+            const container = document.getElementById('ingredientRowContainer');
+            const row = document.createElement('div');
+            row.className = 'ingredient-edit-row';
+            row.innerHTML = `
+                <input type="text" class="ing-name" placeholder="例如：蛋" value="${name}">
+                <input type="number" step="any" class="ing-qty" placeholder="數量" value="${qty}">
+                <input type="text" class="ing-unit" placeholder="例如：顆" value="${unit}">
+                <button type="button" class="ing-del-btn" onclick="this.parentElement.remove()" title="刪除此項">×</button>
+            `;
+            container.appendChild(row);
+        }
+
+        /* ✨ 修改：讀取菜色準備編輯時，自動拆解文字填入結構化輸入框 */
         function editDish(id) {
             const dish = dishDatabase.find(d => d.id === id);
             if (!dish) return;
@@ -752,7 +805,26 @@ async function loadCloudData() {
             document.getElementById('formTitle').innerText = "📝 編輯菜色內容";
             document.getElementById('editDishId').value = dish.id;
             document.getElementById('dishName').value = dish.name;
-            document.getElementById('dishIngredients').value = dish.ingredients.join(', ');
+            
+            // 填入結構化食材欄位
+            const container = document.getElementById('ingredientRowContainer');
+            container.innerHTML = "";
+            if (dish.ingredients && dish.ingredients.length > 0) {
+                dish.ingredients.forEach(str => {
+                    const match = str.match(/^([^\d\s\.]+)([\d\.]+)?(.*)$/);
+                    if (match) {
+                        const name = match[1] ? match[1].trim() : "";
+                        const qty = match[2] ? match[2].trim() : "";
+                        const unit = match[3] ? match[3].trim() : "";
+                        addIngredientRow(name, qty, unit);
+                    } else {
+                        addIngredientRow(str, "", "");
+                    }
+                });
+            } else {
+                addIngredientRow();
+            }
+
             document.getElementById('dishMethod').value = dish.method;
 
             document.querySelectorAll('input[name="tags"]').forEach(cb => {
@@ -763,10 +835,10 @@ async function loadCloudData() {
             document.getElementById('btnCancel').style.display = "block";
         }
 
+        /* ✨ 修改：儲存菜色時，自動抓取所有獨立欄位並拼湊回相容的文字格式送出 */
         async function saveDish() {
             const idVal = document.getElementById('editDishId').value;
             const name = document.getElementById('dishName').value.trim();
-            const ingredientsInput = document.getElementById('dishIngredients').value;
             const method = document.getElementById('dishMethod').value.trim();
             
             const checkboxes = document.querySelectorAll('input[name="tags"]:checked');
@@ -774,7 +846,21 @@ async function loadCloudData() {
             checkboxes.forEach(cb => tags.push(cb.value));
 
             if (!name) { alert('請輸入菜色名稱！'); return; }
-            const ingredients = ingredientsInput.split(',').map(i => i.trim()).filter(i => i !== "");
+
+            // 收集結構化欄位資料並還原為系統拼裝格式
+            const rows = document.querySelectorAll('.ingredient-edit-row');
+            let ingredients = [];
+            rows.forEach(row => {
+                const ingName = row.querySelector('.ing-name').value.trim();
+                const ingQty = row.querySelector('.ing-qty').value.trim();
+                const ingUnit = row.querySelector('.ing-unit').value.trim();
+                
+                if (ingName) {
+                    // 自動黏合為 "品項數量單位" (例如: 蛋 + 1 + 顆 -> 蛋1顆)，相容舊資料
+                    const combined = `${ingName}${ingQty}${ingUnit}`;
+                    ingredients.push(combined);
+                }
+            });
 
             if (idVal) {
                 const dish = dishDatabase.find(d => d.id === parseInt(idVal));
@@ -793,11 +879,16 @@ async function loadCloudData() {
             await saveCloudData();
         }
 
+        /* ✨ 修改：清空表單時同時清空食材面板並留下一列空白輸入列 */
         function clearForm() {
             document.getElementById('formTitle').innerText = "新增自訂菜色";
             document.getElementById('editDishId').value = "";
             document.getElementById('dishName').value = "";
-            document.getElementById('dishIngredients').value = "";
+            
+            // 重設食材區域
+            document.getElementById('ingredientRowContainer').innerHTML = "";
+            addIngredientRow(); // 預設留一列空白供輸入
+            
             document.getElementById('dishMethod').value = "";
             document.querySelectorAll('input[name="tags"]').forEach(cb => cb.checked = false);
             document.getElementById('btnSubmit').innerText = "加入菜色庫";
@@ -919,6 +1010,7 @@ async function loadCloudData() {
 
         window.onload = () => {
             loadCloudData();
+            clearForm(); // 確保初次載入時表單初始化，出現一筆空白食材框
         };
     </script>
 </body>
