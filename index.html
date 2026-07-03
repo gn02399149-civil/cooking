@@ -1,346 +1,789 @@
-// ⚠️ 記得把下面的網址換成你專屬的 Google Apps Script 部署網址
-const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwoHtAUTSVOkAmMkVp1MpWq7_oJGJP8mDxjU5uHi6sZ-8AlHmydABJ1qoGC0PzyhJ9P/exec";
-
-let dishDatabase = [];
-let menuSchedule = {};
-let currentFilter = '全部';
-let selectedDateKey = null;
-
-// 在網頁頂部動態插入一個雲端同步狀態條
-function updateSyncStatus(status, text) {
-    let bar = document.getElementById('syncStatusBar');
-    if (!bar) {
-        bar = document.createElement('div');
-        bar.id = 'syncStatusBar';
-        bar.style = "position: fixed; top: 0; left: 0; width: 100%; text-align: center; font-size: 0.8rem; padding: 4px; z-index: 9999; font-weight: bold;";
-        document.body.appendChild(bar);
-    }
-    if (status === 'loading') {
-        bar.style.backgroundColor = '#feebc8'; bar.style.color = '#dd6b20'; bar.innerText = text || '⏳ 雲端資料同步中...';
-    } else if (status === 'success') {
-        bar.style.backgroundColor = '#c6f6d5'; bar.style.color = '#22543d'; bar.innerText = text || '✅ 雲端同步成功';
-        setTimeout(() => bar.style.display = 'none', 2000);
-    } else if (status === 'error') {
-        bar.style.backgroundColor = '#fed7d7'; bar.style.color = '#9b2c2c'; bar.innerText = text || '❌ 同步失敗，請檢查網路';
-    }
-    bar.style.display = 'block';
-}
-
-// 遠端讀取試算表資料
-async function loadCloudData() {
-    updateSyncStatus('loading', '⏳ 正在自 Google 試算表下載備料排程...');
-    try {
-        const response = await fetch(`${GAS_API_URL}?action=getData`);
-        const data = await response.json();
-        
-        dishDatabase = data.dishes || [];
-        menuSchedule = data.schedule || {};
-        
-        // 如果雲端完全沒資料，載入初始預設值
-        if (dishDatabase.length === 0) {
-            dishDatabase = [
-                { id: 1, name: "肉絲炒飯", tags: ["中餐", "晚餐"], ingredients: ["白飯300g", "豬肉絲120g", "雞蛋2顆", "蔥20g"], method: "大火熱油炒香肉絲，下蛋液與白飯快速翻炒。" },
-                { id: 2, name: "火腿蛋餅", tags: ["早餐", "宵夜"], ingredients: ["蛋餅皮1張", "雞蛋1顆", "火腿片1片"], method: "中火將餅皮煎至兩面微黃，倒入蛋液蓋上餅皮。" }
-            ];
-            await saveCloudData(); // 順便幫雲端初始化
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>每日烹飪排程與量化備料系統</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
         }
 
-        renderDishList();
-        renderCalendar();
-        selectedDateKey = "7/3"; // 預設今天
-        updateIngredientsSummary(selectedDateKey);
-        updateSyncStatus('success', '✅ 雲端資料載入完成！');
-    } catch (error) {
-        console.error(error);
-        updateSyncStatus('error', '❌ 無法連線至雲端資料庫，請檢查 API 網址。');
-    }
-}
+        body {
+            display: flex;
+            height: 100vh;
+            background-color: #f5f7fa;
+            color: #333;
+        }
 
-// 遠端存入試算表資料
-async function saveCloudData() {
-    updateSyncStatus('loading', '💾 正在同步更新至 Google 雲端...');
-    try {
-        const response = await fetch(GAS_API_URL, {
-            method: 'POST',
-            mode: 'no-cors', // 使用 no-cors 模式避免跨網域資安封鎖
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                action: 'saveAll',
-                dishes: dishDatabase,
-                schedule: menuSchedule
-            })
-        });
+        .main-content {
+            width: 75%;
+            height: 100%;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar {
+            width: 25%;
+            height: 100%;
+            background-color: #fff;
+            border-left: 1px solid #e2e8f0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: -2px 0 5px rgba(0,0,0,0.02);
+            overflow-y: auto;
+        }
+
+        header {
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        header h1 {
+            font-size: 1.5rem;
+            color: #2d3748;
+        }
+
+        .summary-panel {
+            background-color: #ebf8ff;
+            border: 1px solid #bee3f8;
+            border-radius: 8px;
+            padding: 12px 15px;
+            margin-bottom: 15px;
+            display: none;
+        }
+
+        .summary-title {
+            font-weight: bold;
+            color: #2b6cb0;
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+        }
+
+        .ingredients-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            list-style: none;
+            font-size: 0.9rem;
+        }
+
+        .ingredient-tag {
+            background-color: #fff;
+            border: 1px solid #3182ce;
+            padding: 6px 12px;
+            border-radius: 6px;
+            color: #2b6cb0;
+            font-weight: bold;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        .week-header-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 10px;
+            margin-bottom: 8px;
+            text-align: center;
+        }
+
+        .weekday-label {
+            font-weight: bold;
+            font-size: 0.9rem;
+            color: #718096;
+            padding: 6px 0;
+            background-color: #e2e8f0;
+            border-radius: 4px;
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 10px;
+        }
+
+        .day-card {
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            min-height: 240px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .day-card:hover:not(.empty) {
+            border-color: #cbd5e0;
+        }
+
+        .day-card.active-select {
+            border-color: #4299e1;
+            background-color: #f7fafc;
+            box-shadow: 0 0 0 2px #4299e1;
+        }
+
+        .day-card.empty {
+            background-color: #edf2f7;
+            border: 1px dashed #cbd5e0;
+            opacity: 0.6;
+            cursor: default;
+        }
+
+        .day-card.today {
+            background-color: #fffaf0;
+            border-color: #dd6b20;
+        }
+
+        .day-title {
+            font-weight: bold;
+            font-size: 0.9rem;
+            color: #2d3748;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #edf2f7;
+            padding-bottom: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .day-title .badge {
+            font-size: 0.75rem;
+            background-color: #dd6b20;
+            color: white;
+            padding: 1px 5px;
+            border-radius: 3px;
+        }
+
+        .meal-slot {
+            margin-bottom: 5px;
+            padding: 4px;
+            background-color: #f7fafc;
+            border: 1px dashed #cbd5e0;
+            border-radius: 4px;
+            min-height: 38px;
+            transition: background-color 0.2s;
+        }
+
+        .meal-slot.drag-over {
+            background-color: #feebc8;
+            border-color: #dd6b20;
+        }
+
+        .meal-slot-title {
+            font-size: 0.65rem;
+            color: #a0aec0;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .placed-dish {
+            background-color: #3182ce;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.75rem;
+            margin-bottom: 2px;
+            cursor: grab;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .placed-dish .remove-btn {
+            cursor: pointer;
+            font-weight: bold;
+            margin-left: 4px;
+            padding: 0 2px;
+            opacity: 0.7;
+        }
+
+        .placed-dish .remove-btn:hover {
+            opacity: 1;
+            color: #fed7d7;
+        }
+
+        .section-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #2d3748;
+            margin-bottom: 12px;
+            margin-top: 15px;
+        }
+
+        .section-title:first-child {
+            margin-top: 0;
+        }
+
+        .category-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+
+        .tab {
+            padding: 4px 10px;
+            background-color: #edf2f7;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            border: none;
+            color: #4a5568;
+        }
+
+        .tab.active {
+            background-color: #3182ce;
+            color: white;
+        }
+
+        .dish-list {
+            height: 220px;
+            overflow-y: auto;
+            border: 1px solid #edf2f7;
+            border-radius: 6px;
+            padding: 8px;
+            background-color: #f7fafc;
+            margin-bottom: 15px;
+        }
+
+        .dish-item {
+            background-color: #fff;
+            padding: 8px 10px;
+            margin-bottom: 6px;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+            cursor: grab;
+            font-size: 0.85rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .dish-item:hover {
+            border-color: #3182ce;
+            background-color: #ebf8ff;
+        }
+
+        .dish-item .edit-icon {
+            cursor: pointer;
+            color: #a0aec0;
+            font-size: 0.8rem;
+            padding: 2px 4px;
+        }
+
+        .dish-item .edit-icon:hover {
+            color: #3182ce;
+        }
+
+        .method-panel {
+            background-color: #f0fff4;
+            border: 1px solid #c6f6d5;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 15px;
+            display: none;
+        }
+
+        .method-title {
+            font-weight: bold;
+            color: #22543d;
+            font-size: 0.9rem;
+            margin-bottom: 4px;
+        }
+
+        .method-text {
+            font-size: 0.85rem;
+            color: #2f855a;
+            white-space: pre-line;
+        }
+
+        .add-dish-form {
+            border-top: 1px solid #e2e8f0;
+            padding-top: 15px;
+        }
+
+        .form-group {
+            margin-bottom: 10px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.8rem;
+            color: #4a5568;
+            margin-bottom: 4px;
+            font-weight: bold;
+        }
+
+        .form-group input[type="text"], .form-group textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #cbd5e0;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+
+        .checkbox-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+        }
+
+        .checkbox-label {
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 10px;
+            background-color: #48bb78;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .btn-submit:hover {
+            background-color: #38a169;
+        }
+
+        .btn-cancel {
+            width: 100%;
+            padding: 6px;
+            background-color: #e2e8f0;
+            color: #4a5568;
+            border: none;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            margin-top: 5px;
+            cursor: pointer;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="main-content">
+        <header>
+            <h1>半個月烹飪排程系統</h1>
+            <span style="color: #718096; font-size: 0.85rem;">提示：輸入材料如「豬肉150g, 雞蛋2顆」，系統會自動識別並加總。</span>
+        </header>
+
+        <div class="summary-panel" id="summaryPanel">
+            <div class="summary-title" id="summaryTitle">備料清單總計</div>
+            <ul class="ingredients-list" id="ingredientsList"></ul>
+        </div>
         
-        // 註：no-cors 模式下無法讀取 response 內容，但若沒拋出 error 即代表發送成功
-        updateSyncStatus('success', '✅ 備料排程已安全存入雲端！');
-    } catch (error) {
-        console.error(error);
-        updateSyncStatus('error', '❌ 儲存至雲端失敗。');
-    }
-}
+        <div class="week-header-grid">
+            <div class="weekday-label">週一</div><div class="weekday-label">週二</div><div class="weekday-label">週三</div>
+            <div class="weekday-label">週四</div><div class="weekday-label">週五</div><div class="weekday-label">週六</div>
+            <div class="weekday-label">週日</div>
+        </div>
+        
+        <div class="calendar-grid" id="calendarGrid"></div>
+    </div>
 
-// 【核心邏輯】材料智慧解析與加總器
-function parseAndAggregateIngredients(ingredientsArray) {
-    let totals = {};
-    ingredientsArray.forEach(str => {
-        if (!str) return;
-        const match = str.match(/^([^\d\s\.]+)([\d\.]+)?(.*)$/);
-        if (match) {
-            const name = match[1].trim();
-            const value = match[2] ? parseFloat(match[2]) : null;
-            const unit = match[3] ? match[3].trim() : '';
+    <div class="sidebar">
+        <div class="method-panel" id="methodPanel">
+            <div class="method-title" id="methodDishName">菜色名稱</div>
+            <div class="method-text" id="methodContent">烹飪手法說明...</div>
+        </div>
 
-            if (value !== null) {
-                if (!totals[name]) totals[name] = { value: 0, unit: unit };
-                totals[name].value += value;
-                if(unit) totals[name].unit = unit; 
-            } else {
-                if (!totals[name]) totals[name] = { value: null, unit: unit };
+        <div class="section-title">我的菜色庫</div>
+        
+        <div class="category-tabs" id="categoryTabs">
+            <button class="tab active" onclick="filterDishes('全部', this)">全部</button>
+            <button class="tab" onclick="filterDishes('早餐', this)">早餐</button>
+            <button class="tab" onclick="filterDishes('中餐', this)">中餐</button>
+            <button class="tab" onclick="filterDishes('晚餐', this)">晚餐</button>
+            <button class="tab" onclick="filterDishes('宵夜', this)">宵夜</button>
+            <button class="tab" onclick="filterDishes('點心', this)">點心</button>
+        </div>
+
+        <div class="dish-list" id="dishList"></div>
+
+        <div class="add-dish-form">
+            <div class="section-title" id="formTitle">新增自訂菜色</div>
+            <input type="hidden" id="editDishId" value="">
+            
+            <div class="form-group">
+                <label for="dishName">菜色名稱</label>
+                <input type="text" id="dishName" placeholder="例如：番茄炒蛋">
+            </div>
+            <div class="form-group">
+                <label>歸類標籤 (可多選)</label>
+                <div class="checkbox-grid">
+                    <label class="checkbox-label"><input type="checkbox" name="tags" value="早餐"> 早餐</label>
+                    <label class="checkbox-label"><input type="checkbox" name="tags" value="中餐"> 中餐</label>
+                    <label class="checkbox-label"><input type="checkbox" name="tags" value="晚餐"> 晚餐</label>
+                    <label class="checkbox-label"><input type="checkbox" name="tags" value="宵夜"> 宵夜</label>
+                    <label class="checkbox-label"><input type="checkbox" name="tags" value="點心"> 點心</label>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="dishIngredients">所需材料與量化 (用逗號隔開)</label>
+                <input type="text" id="dishIngredients" placeholder="例如：白飯300g, 豬肉絲100g, 雞蛋2顆">
+            </div>
+            <div class="form-group">
+                <label for="dishMethod">烹飪手法說明</label>
+                <textarea id="dishMethod" rows="3" placeholder="請描述配方與煮法..."></textarea>
+            </div>
+            <button class="btn-submit" id="btnSubmit" onclick="saveDish()">加入菜色庫</button>
+            <button class="btn-cancel" id="btnCancel" onclick="clearForm()">取消編輯</button>
+        </div>
+    </div>
+
+    <script>
+        const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwoHtAUTSVOkAmMkVp1MpWq7_oJGJP8mDxjU5uHi6sZ-8AlHmydABJ1qoGC0PzyhJ9P/exec";
+
+        let dishDatabase = [];
+        let menuSchedule = {};
+        let currentFilter = '全部';
+        let selectedDateKey = null;
+
+        function updateSyncStatus(status, text) {
+            let bar = document.getElementById('syncStatusBar');
+            if (!bar) {
+                bar = document.createElement('div');
+                bar.id = 'syncStatusBar';
+                bar.style = "position: fixed; top: 0; left: 0; width: 100%; text-align: center; font-size: 0.8rem; padding: 4px; z-index: 9999; font-weight: bold;";
+                document.body.appendChild(bar);
+            }
+            if (status === 'loading') {
+                bar.style.backgroundColor = '#feebc8'; bar.style.color = '#dd6b20'; bar.innerText = text || '⏳ 雲端資料同步中...';
+            } else if (status === 'success') {
+                bar.style.backgroundColor = '#c6f6d5'; bar.style.color = '#22543d'; bar.innerText = text || '✅ 雲端同步成功';
+                setTimeout(() => bar.style.display = 'none', 2000);
+            } else if (status === 'error') {
+                bar.style.backgroundColor = '#fed7d7'; bar.style.color = '#9b2c2c'; bar.innerText = text || '❌ 同步失敗，請檢查網路';
+            }
+            bar.style.display = 'block';
+        }
+
+        async function loadCloudData() {
+            updateSyncStatus('loading', '⏳ 正在自 Google 試算表下載備料排程...');
+            try {
+                const response = await fetch(`${GAS_API_URL}?action=getData`);
+                const data = await response.json();
+                
+                dishDatabase = data.dishes || [];
+                menuSchedule = data.schedule || {};
+                
+                if (dishDatabase.length === 0) {
+                    dishDatabase = [
+                        { id: 1, name: "肉絲炒飯", tags: ["中餐", "晚餐"], ingredients: ["白飯300g", "豬肉絲120g", "雞蛋2顆", "蔥20g"], method: "大火熱油炒香肉絲，下蛋液與白飯快速翻炒。" },
+                        { id: 2, name: "火腿蛋餅", tags: ["早餐", "宵夜"], ingredients: ["蛋餅皮1張", "雞蛋1顆", "火腿片1片"], method: "中火將餅皮煎至兩面微黃，倒入蛋液蓋上餅皮。" }
+                    ];
+                    await saveCloudData();
+                }
+
+                renderDishList();
+                renderCalendar();
+                selectedDateKey = "7/3";
+                updateIngredientsSummary(selectedDateKey);
+                updateSyncStatus('success', '✅ 雲端資料載入完成！');
+            } catch (error) {
+                console.error(error);
+                updateSyncStatus('error', '❌ 無法連線至雲端資料庫，請檢查 API 網址。');
             }
         }
-    });
 
-    let resultStrings = [];
-    for (let name in totals) {
-        if (totals[name].value !== null) {
-            const roundedValue = Math.round(totals[name].value * 100) / 100;
-            resultStrings.push(`${name} : ${roundedValue} ${totals[name].unit}`);
-        } else {
-            resultStrings.push(`${name}`);
+        async function saveCloudData() {
+            updateSyncStatus('loading', '💾 正在同步更新至 Google 雲端...');
+            try {
+                await fetch(GAS_API_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'saveAll',
+                        dishes: dishDatabase,
+                        schedule: menuSchedule
+                    })
+                });
+                updateSyncStatus('success', '✅ 備料排程已安全存入雲端！');
+            } catch (error) {
+                console.error(error);
+                updateSyncStatus('error', '❌ 儲存至雲端失敗。');
+            }
         }
-    }
-    return resultStrings;
-}
 
-function updateIngredientsSummary(dateKey) {
-    const panel = document.getElementById('summaryPanel');
-    const title = document.getElementById('summaryTitle');
-    const listContainer = document.getElementById('ingredientsList');
-    
-    title.innerText = `📊 ${dateKey} 備料清單與食材量化加總`;
-    listContainer.innerHTML = '';
+        function parseAndAggregateIngredients(ingredientsArray) {
+            let totals = {};
+            ingredientsArray.forEach(str => {
+                if (!str) return;
+                const match = str.match(/^([^\d\s\.]+)([\d\.]+)?(.*)$/);
+                if (match) {
+                    const name = match[1].trim();
+                    const value = match[2] ? parseFloat(match[2]) : null;
+                    const unit = match[3] ? match[3].trim() : '';
 
-    const dayMeals = menuSchedule[dateKey];
-    let allIngredients = [];
-    let hasFood = false;
+                    if (value !== null) {
+                        if (!totals[name]) totals[name] = { value: 0, unit: unit };
+                        totals[name].value += value;
+                        if(unit) totals[name].unit = unit; 
+                    } else {
+                        if (!totals[name]) totals[name] = { value: null, unit: unit };
+                    }
+                }
+            });
 
-    if (dayMeals) {
-        ['早餐', '中餐', '晚餐', '宵夜', '點心'].forEach(mealType => {
-            if (dayMeals[mealType] && dayMeals[mealType].length > 0) {
-                hasFood = true;
-                dayMeals[mealType].forEach(dishId => {
-                    const dish = dishDatabase.find(d => d.id === dishId);
-                    if (dish && dish.ingredients) {
-                        allIngredients = allIngredients.concat(dish.ingredients);
+            let resultStrings = [];
+            for (let name in totals) {
+                if (totals[name].value !== null) {
+                    const roundedValue = Math.round(totals[name].value * 100) / 100;
+                    resultStrings.push(`${name} : ${roundedValue} ${totals[name].unit}`);
+                } else {
+                    resultStrings.push(`${name}`);
+                }
+            }
+            return resultStrings;
+        }
+
+        function updateIngredientsSummary(dateKey) {
+            const panel = document.getElementById('summaryPanel');
+            const title = document.getElementById('summaryTitle');
+            const listContainer = document.getElementById('ingredientsList');
+            
+            title.innerText = `📊 ${dateKey} 備料清單與食材量化加總`;
+            listContainer.innerHTML = '';
+
+            const dayMeals = menuSchedule[dateKey];
+            let allIngredients = [];
+            let hasFood = false;
+
+            if (dayMeals) {
+                ['早餐', '中餐', '晚餐', '宵夜', '點心'].forEach(mealType => {
+                    if (dayMeals[mealType] && dayMeals[mealType].length > 0) {
+                        hasFood = true;
+                        dayMeals[mealType].forEach(dishId => {
+                            const dish = dishDatabase.find(d => d.id === dishId);
+                            if (dish && dish.ingredients) {
+                                allIngredients = allIngredients.concat(dish.ingredients);
+                            }
+                        });
                     }
                 });
             }
-        });
-    }
 
-    if (!hasFood) {
-        listContainer.innerHTML = '<li>今天此日無排餐，無需備料！</li>';
-        panel.style.display = 'block';
-        return;
-    }
+            if (!hasFood) {
+                listContainer.innerHTML = '<li>今天此日無排餐，無需備料！</li>';
+                panel.style.display = 'block';
+                return;
+            }
 
-    let aggregatedIngredients = parseAndAggregateIngredients(allIngredients);
+            let aggregatedIngredients = parseAndAggregateIngredients(allIngredients);
 
-    if(aggregatedIngredients.length === 0) {
-        listContainer.innerHTML = '<li>所選菜色未設定材料。</li>';
-    } else {
-        aggregatedIngredients.forEach(ing => {
-            const li = document.createElement('li');
-            li.className = 'ingredient-tag';
-            li.innerText = ing;
-            listContainer.appendChild(li);
-        });
-    }
-    panel.style.display = 'block';
-}
-
-function renderDishList() {
-    const container = document.getElementById('dishList');
-    container.innerHTML = '';
-    const filtered = dishDatabase.filter(d => currentFilter === '全部' || d.tags.includes(currentFilter));
-
-    filtered.forEach(dish => {
-        const item = document.createElement('div');
-        item.className = 'dish-item';
-        item.setAttribute('draggable', 'true');
-        item.innerHTML = `
-            <span onclick="showCookingMethod(${dish.id})">${dish.name}</span>
-            <span class="edit-icon" onclick="editDish(${dish.id})">✏️</span>
-        `;
-        item.ondragstart = (e) => { e.dataTransfer.setData('text/plain', dish.id); };
-        container.appendChild(item);
-    });
-}
-
-function filterDishes(tag, button) {
-    currentFilter = tag;
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    button.classList.add('active');
-    renderDishList();
-}
-
-function showCookingMethod(id) {
-    const dish = dishDatabase.find(d => d.id === id);
-    if (!dish) return;
-    document.getElementById('methodPanel').style.display = 'block';
-    document.getElementById('methodDishName').innerText = `🍳 ${dish.name} - 烹飪配方`;
-    document.getElementById('methodContent').innerText = `【材料】\n${dish.ingredients.join('\n')}\n\n【做法】\n${dish.method || "暫無說明。"}`;
-}
-
-function editDish(id) {
-    const dish = dishDatabase.find(d => d.id === id);
-    if (!dish) return;
-
-    document.getElementById('formTitle').innerText = "📝 編輯菜色內容";
-    document.getElementById('editDishId').value = dish.id;
-    document.getElementById('dishName').value = dish.name;
-    document.getElementById('dishIngredients').value = dish.ingredients.join(', ');
-    document.getElementById('dishMethod').value = dish.method;
-
-    document.querySelectorAll('input[name="tags"]').forEach(cb => {
-        cb.checked = dish.tags.includes(cb.value);
-    });
-
-    document.getElementById('btnSubmit').innerText = "更新菜色配方";
-    document.getElementById('btnCancel').style.display = "block";
-}
-
-async function saveDish() {
-    const idVal = document.getElementById('editDishId').value;
-    const name = document.getElementById('dishName').value.trim();
-    const ingredientsInput = document.getElementById('dishIngredients').value;
-    const method = document.getElementById('dishMethod').value.trim();
-    
-    const checkboxes = document.querySelectorAll('input[name="tags"]:checked');
-    let tags = [];
-    checkboxes.forEach(cb => tags.push(cb.value));
-
-    if (!name) { alert('請輸入菜色名稱！'); return; }
-    const ingredients = ingredientsInput.split(',').map(i => i.trim()).filter(i => i !== "");
-
-    if (idVal) {
-        const dish = dishDatabase.find(d => d.id === parseInt(idVal));
-        if (dish) {
-            dish.name = name; dish.tags = tags; dish.ingredients = ingredients; dish.method = method;
-        }
-    } else {
-        dishDatabase.push({ id: Date.now(), name, tags, ingredients, method });
-    }
-
-    clearForm();
-    renderDishList();
-    renderCalendar();
-    if (selectedDateKey) updateIngredientsSummary(selectedDateKey);
-    
-    // 異步同步至雲端試算表
-    await saveCloudData();
-}
-
-function clearForm() {
-    document.getElementById('formTitle').innerText = "新增自訂菜色";
-    document.getElementById('editDishId').value = "";
-    document.getElementById('dishName').value = "";
-    document.getElementById('dishIngredients').value = "";
-    document.getElementById('dishMethod').value = "";
-    document.querySelectorAll('input[name="tags"]').forEach(cb => cb.checked = false);
-    document.getElementById('btnSubmit').innerText = "加入菜色庫";
-    document.getElementById('btnCancel').style.display = "none";
-}
-
-function renderCalendar() {
-    const grid = document.getElementById('calendarGrid');
-    grid.innerHTML = '';
-    
-    const startDate = new Date(2026, 6, 3); // 7月3日
-    const startDayOfWeek = startDate.getDay();
-    const currentDayOfWeekIdx = startDayOfWeek === 0 ? 7 : startDayOfWeek;
-    
-    for (let i = 1; i < currentDayOfWeekIdx; i++) {
-        const emptyCard = document.createElement('div');
-        emptyCard.className = 'day-card empty';
-        grid.appendChild(emptyCard);
-    }
-
-    const mealTypes = ['早餐', '中餐', '晚餐', '宵夜', '點心'];
-
-    for (let i = 0; i < 15; i++) {
-        const targetDate = new Date(startDate);
-        targetDate.setDate(startDate.getDate() + i);
-        const month = targetDate.getMonth() + 1;
-        const date = targetDate.getDate();
-        const dateKey = `${month}/${date}`;
-        
-        const isToday = i === 0 ? 'today' : '';
-        const card = document.createElement('div');
-        card.className = `day-card ${isToday}`;
-        if(dateKey === selectedDateKey) card.classList.add('active-select');
-        
-        card.onclick = () => {
-            selectedDateKey = dateKey;
-            document.querySelectorAll('.day-card').forEach(c => c.classList.remove('active-select'));
-            card.classList.add('active-select');
-            updateIngredientsSummary(dateKey);
-        };
-
-        let todayBadge = i === 0 ? '<span class="badge">今天</span>' : '';
-        card.innerHTML = `<div class="day-title"><span>${dateKey}</span>${todayBadge}</div>`;
-        
-        if (!menuSchedule[dateKey]) {
-            menuSchedule[dateKey] = { 早餐: [], 中餐: [], 晚餐: [], 宵夜: [], 點心: [] };
+            if(aggregatedIngredients.length === 0) {
+                listContainer.innerHTML = '<li>所選菜色未設定材料。</li>';
+            } else {
+                aggregatedIngredients.forEach(ing => {
+                    const li = document.createElement('li');
+                    li.className = 'ingredient-tag';
+                    li.innerText = ing;
+                    listContainer.appendChild(li);
+                });
+            }
+            panel.style.display = 'block';
         }
 
-        mealTypes.forEach(mealType => {
-            const slot = document.createElement('div');
-            slot.className = 'meal-slot';
-            slot.innerHTML = `<div class="meal-slot-title">${mealType}</div>`;
-            
-            slot.ondragover = (e) => { e.preventDefault(); slot.classList.add('drag-over'); };
-            slot.ondragleave = () => slot.classList.remove('drag-over');
-            slot.ondrop = async (e) => {
-                e.preventDefault();
-                slot.classList.remove('drag-over');
-                const dishId = parseInt(e.dataTransfer.getData('text/plain'));
-                
-                if (!menuSchedule[dateKey][mealType].includes(dishId)) {
-                    menuSchedule[dateKey][mealType].push(dishId);
-                    renderCalendar();
-                    if (dateKey === selectedDateKey) updateIngredientsSummary(dateKey);
-                    await saveCloudData(); // 拖曳排餐後自動存雲端
-                }
-            };
+        function renderDishList() {
+            const container = document.getElementById('dishList');
+            container.innerHTML = '';
+            const filtered = dishDatabase.filter(d => currentFilter === '全部' || d.tags.includes(currentFilter));
 
-            const dishIds = menuSchedule[dateKey][mealType] || [];
-            dishIds.forEach(dishId => {
-                const dish = dishDatabase.find(d => d.id === dishId);
-                if (dish) {
-                    const dishEl = document.createElement('div');
-                    dishEl.className = 'placed-dish';
-                    dishEl.innerHTML = `
-                        <span onclick="event.stopPropagation(); showCookingMethod(${dish.id})">${dish.name}</span>
-                        <span class="remove-btn" onclick="event.stopPropagation(); removeDishFromSchedule('${dateKey}', '${mealType}', ${dish.id})">×</span>
-                    `;
-                    slot.appendChild(dishEl);
-                }
+            filtered.forEach(dish => {
+                const item = document.createElement('div');
+                item.className = 'dish-item';
+                item.setAttribute('draggable', 'true');
+                item.innerHTML = `
+                    <span onclick="showCookingMethod(${dish.id})">${dish.name}</span>
+                    <span class="edit-icon" onclick="editDish(${dish.id})">✏️</span>
+                `;
+                item.ondragstart = (e) => { e.dataTransfer.setData('text/plain', dish.id); };
+                container.appendChild(item);
             });
-            card.appendChild(slot);
-        });
-        grid.appendChild(card);
-    }
-}
+        }
 
-async function removeDishFromSchedule(dateKey, mealType, dishId) {
-    menuSchedule[dateKey][mealType] = menuSchedule[dateKey][mealType].filter(id => id !== dishId);
-    renderCalendar();
-    if (dateKey === selectedDateKey) updateIngredientsSummary(dateKey);
-    await saveCloudData(); // 刪除排餐後自動存雲端
-}
+        function filterDishes(tag, button) {
+            currentFilter = tag;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            button.classList.add('active');
+            renderDishList();
+        }
 
-// 網頁開啟時，自動去 Google 試算表載入資料
-window.onload = () => {
-    loadCloudData();
-};
+        function showCookingMethod(id) {
+            const dish = dishDatabase.find(d => d.id === id);
+            if (!dish) return;
+            document.getElementById('methodPanel').style.display = 'block';
+            document.getElementById('methodDishName').innerText = `🍳 ${dish.name} - 烹飪配方`;
+            document.getElementById('methodContent').innerText = `【材料】\n${dish.ingredients.join('\n')}\n\n【做法】\n${dish.method || "暫無說明。"}`;
+        }
+
+        function editDish(id) {
+            const dish = dishDatabase.find(d => d.id === id);
+            if (!dish) return;
+
+            document.getElementById('formTitle').innerText = "📝 編輯菜色內容";
+            document.getElementById('editDishId').value = dish.id;
+            document.getElementById('dishName').value = dish.name;
+            document.getElementById('dishIngredients').value = dish.ingredients.join(', ');
+            document.getElementById('dishMethod').value = dish.method;
+
+            document.querySelectorAll('input[name="tags"]').forEach(cb => {
+                cb.checked = dish.tags.includes(cb.value);
+            });
+
+            document.getElementById('btnSubmit').innerText = "更新菜色配方";
+            document.getElementById('btnCancel').style.display = "block";
+        }
+
+        async function saveDish() {
+            const idVal = document.getElementById('editDishId').value;
+            const name = document.getElementById('dishName').value.trim();
+            const ingredientsInput = document.getElementById('dishIngredients').value;
+            const method = document.getElementById('dishMethod').value.trim();
+            
+            const checkboxes = document.querySelectorAll('input[name="tags"]:checked');
+            let tags = [];
+            checkboxes.forEach(cb => tags.push(cb.value));
+
+            if (!name) { alert('請輸入菜色名稱！'); return; }
+            const ingredients = ingredientsInput.split(',').map(i => i.trim()).filter(i => i !== "");
+
+            if (idVal) {
+                const dish = dishDatabase.find(d => d.id === parseInt(idVal));
+                if (dish) {
+                    dish.name = name; dish.tags = tags; dish.ingredients = ingredients; dish.method = method;
+                }
+            } else {
+                dishDatabase.push({ id: Date.now(), name, tags, ingredients, method });
+            }
+
+            clearForm();
+            renderDishList();
+            renderCalendar();
+            if (selectedDateKey) updateIngredientsSummary(selectedDateKey);
+            
+            await saveCloudData();
+        }
+
+        function clearForm() {
+            document.getElementById('formTitle').innerText = "新增自訂菜色";
+            document.getElementById('editDishId').value = "";
+            document.getElementById('dishName').value = "";
+            document.getElementById('dishIngredients').value = "";
+            document.getElementById('dishMethod').value = "";
+            document.querySelectorAll('input[name="tags"]').forEach(cb => cb.checked = false);
+            document.getElementById('btnSubmit').innerText = "加入菜色庫";
+            document.getElementById('btnCancel').style.display = "none";
+        }
+
+        function renderCalendar() {
+            const grid = document.getElementById('calendarGrid');
+            grid.innerHTML = '';
+            
+            const startDate = new Date(2026, 6, 3); 
+            const startDayOfWeek = startDate.getDay();
+            const currentDayOfWeekIdx = startDayOfWeek === 0 ? 7 : startDayOfWeek;
+            
+            for (let i = 1; i < currentDayOfWeekIdx; i++) {
+                const emptyCard = document.createElement('div');
+                emptyCard.className = 'day-card empty';
+                grid.appendChild(emptyCard);
+            }
+
+            const mealTypes = ['早餐', '中餐', '晚餐', '宵夜', '點心'];
+
+            for (let i = 0; i < 15; i++) {
+                const targetDate = new Date(startDate);
+                targetDate.setDate(startDate.getDate() + i);
+                const month = targetDate.getMonth() + 1;
+                const date = targetDate.getDate();
+                const dateKey = `${month}/${date}`;
+                
+                const isToday = i === 0 ? 'today' : '';
+                const card = document.createElement('div');
+                card.className = `day-card ${isToday}`;
+                if(dateKey === selectedDateKey) card.classList.add('active-select');
+                
+                card.onclick = () => {
+                    selectedDateKey = dateKey;
+                    document.querySelectorAll('.day-card').forEach(c => c.classList.remove('active-select'));
+                    card.classList.add('active-select');
+                    updateIngredientsSummary(dateKey);
+                };
+
+                let todayBadge = i === 0 ? '<span class="badge">今天</span>' : '';
+                card.innerHTML = `<div class="day-title"><span>${dateKey}</span>${todayBadge}</div>`;
+                
+                if (!menuSchedule[dateKey]) {
+                    menuSchedule[dateKey] = { 早餐: [], 中餐: [], 晚餐: [], 宵夜: [], 點心: [] };
+                }
+
+                mealTypes.forEach(mealType => {
+                    const slot = document.createElement('div');
+                    slot.className = 'meal-slot';
+                    slot.innerHTML = `<div class="meal-slot-title">${mealType}</div>`;
+                    
+                    slot.ondragover = (e) => { e.preventDefault(); slot.classList.add('drag-over'); };
+                    slot.ondragleave = () => slot.classList.remove('drag-over');
+                    slot.ondrop = async (e) => {
+                        e.preventDefault();
+                        slot.classList.remove('drag-over');
+                        const dishId = parseInt(e.dataTransfer.getData('text/plain'));
+                        
+                        if (!menuSchedule[dateKey][mealType].includes(dishId)) {
+                            menuSchedule[dateKey][mealType].push(dishId);
+                            renderCalendar();
+                            if (dateKey === selectedDateKey) updateIngredientsSummary(dateKey);
+                            await saveCloudData(); 
+                        }
+                    };
+
+                    const dishIds = menuSchedule[dateKey][mealType] || [];
+                    dishIds.forEach(dishId => {
+                        const dish = dishDatabase.find(d => d.id === dishId);
+                        if (dish) {
+                            const dishEl = document.createElement('div');
+                            dishEl.className = 'placed-dish';
+                            dishEl.innerHTML = `
+                                <span onclick="event.stopPropagation(); showCookingMethod(${dish.id})">${dish.name}</span>
+                                <span class="remove-btn" onclick="event.stopPropagation(); removeDishFromSchedule('${dateKey}', '${mealType}', ${dish.id})">×</span>
+                            `;
+                            slot.appendChild(dishEl);
+                        }
+                    });
+                    card.appendChild(slot);
+                });
+                grid.appendChild(card);
+            }
+        }
+
+        async function removeDishFromSchedule(dateKey, mealType, dishId) {
+            menuSchedule[dateKey][mealType] = menuSchedule[dateKey][mealType].filter(id => id !== dishId);
+            renderCalendar();
+            if (dateKey === selectedDateKey) updateIngredientsSummary(dateKey);
+            await saveCloudData(); 
+        }
+
+        window.onload = () => {
+            loadCloudData();
+        };
+    </script>
+</body>
+</html>
