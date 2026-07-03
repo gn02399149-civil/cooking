@@ -524,31 +524,37 @@
             bar.style.display = 'block';
         }
 
-        async function loadCloudData() {
-            updateSyncStatus('loading', '⏳ 正在自 Google 試算表下載備料排程...');
-            try {
-                const response = await fetch(`${GAS_API_URL}?action=getData`);
-                const data = await response.json();
-                
-                dishDatabase = data.dishes || [];
-                menuSchedule = data.schedule || {};
-                
-                if (dishDatabase.length === 0) {
-                    dishDatabase = [
-                        { id: 1, name: "肉絲炒飯", tags: ["中餐", "晚餐"], ingredients: ["白飯300g", "豬肉絲120g", "雞蛋2顆", "蔥20g"], method: "大火熱油炒香肉絲，下蛋液與白飯快速翻炒。" },
-                        { id: 2, name: "火腿蛋餅", tags: ["早餐", "宵夜"], ingredients: ["蛋餅皮1張", "雞蛋1顆", "火腿片1片"], method: "中火將餅皮煎至兩面微黃，倒入蛋液蓋上餅皮。" }
-                    ];
-                    await saveCloudData();
-                }
-
-                renderDishList();
-                initCalendarView();
-                updateSyncStatus('success', '✅ 雲端資料載入完成！');
-            } catch (error) {
-                console.error(error);
-                updateSyncStatus('error', '❌ 無法連線至雲端資料庫，請確認您的 GAS 部署設定。');
-            }
+async function loadCloudData() {
+    updateSyncStatus('loading', '⏳ 正在自 Google 試算表下載備料排程...');
+    try {
+        // ✨【關鍵修正】在網址後方加上隨機時間戳記（_t），徹底逼迫瀏覽器每次重整都去撈全新的雲端資料，不使用舊快取
+        const response = await fetch(`${GAS_API_URL}?action=getData&_t=${Date.now()}`);
+        const data = await response.json();
+        
+        // 檢查後端是否有拋出錯誤
+        if (data.status === 'error') {
+            throw new Error(data.error || '後端讀取失敗');
         }
+        
+        dishDatabase = data.dishes || [];
+        menuSchedule = data.schedule || {};
+        
+        if (dishDatabase.length === 0) {
+            dishDatabase = [
+                { id: 1, name: "肉絲炒飯", tags: ["中餐", "晚餐"], ingredients: ["白飯300g", "豬肉絲120g", "雞蛋2顆", "蔥20g"], method: "大火熱油炒香肉絲，下蛋液與白飯快速翻炒。" },
+                { id: 2, name: "火腿蛋餅", tags: ["早餐", "宵夜"], ingredients: ["蛋餅皮1張", "雞蛋1顆", "火腿片1片"], method: "中火將餅皮煎至兩面微黃，倒入蛋液蓋上餅皮。" }
+            ];
+            await saveCloudData();
+        }
+
+        renderDishList();
+        initCalendarView();
+        updateSyncStatus('success', '✅ 雲端資料載入完成！');
+    } catch (error) {
+        console.error(error);
+        updateSyncStatus('error', '❌ 無法載入雲端資料：' + error.message);
+    }
+}
 
         async function saveCloudData() {
     updateSyncStatus('loading', '💾 正在同步更新至 Google 雲端...');
