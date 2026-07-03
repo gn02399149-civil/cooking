@@ -495,6 +495,7 @@
     </div>
 
     <script>
+        // ⚠️ 請記得將下方網址替換為你在 GAS 重新部署後取得的最新「網頁應用程式 URL」
         const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxDiEtSRBnpNvSxCA6Ff-dEtBvm_dKkwNvKoGggD1AxuLXYmAtwS-yhd7z-jxYVGa6R/exec";
 
         let dishDatabase = [];
@@ -502,7 +503,6 @@
         let currentFilter = '全部';
         let selectedDateKey = null;
         
-        // 排程起始錨定點日期（預設為今天）
         let calendarAnchorDate = new Date();
 
         function updateSyncStatus(status, text) {
@@ -519,7 +519,7 @@
                 bar.style.backgroundColor = '#c6f6d5'; bar.style.color = '#22543d'; bar.innerText = text || '✅ 雲端同步成功';
                 setTimeout(() => bar.style.display = 'none', 2000);
             } else if (status === 'error') {
-                bar.style.backgroundColor = '#fed7d7'; bar.style.color = '#9b2c2c'; bar.innerText = text || '❌ 同步失敗，請檢查網路';
+                bar.style.backgroundColor = '#fed7d7'; bar.style.color = '#9b2c2c'; bar.innerText = text || '❌ 同步失敗';
             }
             bar.style.display = 'block';
         }
@@ -553,24 +553,32 @@
         async function saveCloudData() {
             updateSyncStatus('loading', '💾 正在同步更新至 Google 雲端...');
             try {
-                // 移除 no-cors，改用標準不透明傳輸或處理好跨網域的標準 POST 請求
+                const payload = JSON.stringify({
+                    action: 'saveAll',
+                    dishes: dishDatabase,
+                    schedule: menuSchedule
+                });
+
+                // 使用 URL-Encoded 格式打包載體，完美避開 OPTIONS 跨網域預檢限制
                 const response = await fetch(GAS_API_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/text' }, // 用文字載體包裹避開特定預檢限制
-                    body: JSON.stringify({
-                        action: 'saveAll',
-                        dishes: dishDatabase,
-                        schedule: menuSchedule
-                    })
+                    mode: 'cors', 
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'postData=' + encodeURIComponent(payload)
                 });
-                updateSyncStatus('success', '✅ 備料排程已安全存入雲端！');
+                
+                const result = await response.json();
+                if (result && result.status === 'success') {
+                    updateSyncStatus('success', '✅ 備料排程已安全存入雲端！');
+                } else {
+                    updateSyncStatus('error', '❌ 雲端回報儲存失敗：' + (result.message || '未知錯誤'));
+                }
             } catch (error) {
                 console.error(error);
-                updateSyncStatus('error', '❌ 儲存至雲端失敗。');
+                updateSyncStatus('error', '❌ 儲存至雲端失敗，請確認 GAS 專案是否已發布為新版本。');
             }
         }
 
-        // 格式化日期格式為 2026-07-03 的 key 結構，確保年度變更時資料不會錯亂
         function formatDateKey(dateObj) {
             const y = dateObj.getFullYear();
             const m = String(dateObj.getMonth() + 1).padStart(2, '0');
@@ -578,11 +586,10 @@
             return `${y}-${m}-${d}`;
         }
 
-        // 針對舊系統簡易標記格式 (M/D) 的相容舊資料機制
         function getScheduleData(dateKey, legacyKey) {
             if (menuSchedule[dateKey]) return menuSchedule[dateKey];
             if (menuSchedule[legacyKey]) {
-                menuSchedule[dateKey] = menuSchedule[legacyKey]; // 自動升級舊格式
+                menuSchedule[dateKey] = menuSchedule[legacyKey];
                 return menuSchedule[dateKey];
             }
             return null;
@@ -625,7 +632,6 @@
             const title = document.getElementById('summaryTitle');
             const listContainer = document.getElementById('ingredientsList');
             
-            // 介面展示用名稱
             const displayDate = dateKey.substring(5).replace('-', '/');
             title.innerText = `📊 ${displayDate} 備料清單與食材量化加總`;
             listContainer.innerHTML = '';
@@ -793,7 +799,6 @@
             document.getElementById('btnCancel').style.display = "none";
         }
 
-        // 時間導航控制
         function changeWeek(daysOffset) {
             calendarAnchorDate.setDate(calendarAnchorDate.getDate() + daysOffset);
             renderCalendar();
@@ -815,7 +820,6 @@
             const grid = document.getElementById('calendarGrid');
             grid.innerHTML = '';
             
-            // 計算目前雙週顯示的起始星期一
             const startDate = new Date(calendarAnchorDate);
             const currentDay = startDate.getDay();
             const diffToMonday = currentDay === 0 ? -6 : 1 - currentDay; 
@@ -824,14 +828,12 @@
             const endDate = new Date(startDate);
             endDate.setDate(startDate.getDate() + 13);
             
-            // 更新畫面上目前顯示的時間範圍文字
             document.getElementById('currentRangeDisplay').innerText = 
                 `📅 目前區間：${startDate.getFullYear()}/${startDate.getMonth()+1}/${startDate.getDate()} ～ ${endDate.getMonth()+1}/${endDate.getDate()}`;
 
             const mealTypes = ['早餐', '中餐', '晚餐', '宵夜', '點心'];
             const todayStr = formatDateKey(new Date());
 
-            // 連續算 14 天
             for (let i = 0; i < 14; i++) {
                 const targetDate = new Date(startDate);
                 targetDate.setDate(startDate.getDate() + i);
@@ -854,9 +856,7 @@
                 let todayBadge = dateKey === todayStr ? '<span class="badge">今天</span>' : '';
                 card.innerHTML = `<div class="day-title"><span>${targetDate.getMonth()+1}/${targetDate.getDate()}</span>${todayBadge}</div>`;
                 
-                // 初始化該日期的結構結構
                 if (!menuSchedule[dateKey]) {
-                    // 若有舊資料結構，予以繼承，否則建全新物件
                     if(menuSchedule[legacyKey]) {
                         menuSchedule[dateKey] = menuSchedule[legacyKey];
                     } else {
