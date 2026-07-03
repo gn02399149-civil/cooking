@@ -551,34 +551,33 @@
         }
 
         async function saveCloudData() {
-            updateSyncStatus('loading', '💾 正在同步更新至 Google 雲端...');
-            try {
-                const payload = JSON.stringify({
-                    action: 'saveAll',
-                    dishes: dishDatabase,
-                    schedule: menuSchedule
-                });
+    updateSyncStatus('loading', '💾 正在同步更新至 Google 雲端...');
+    try {
+        const payload = JSON.stringify({
+            action: 'saveAll',
+            dishes: dishDatabase,
+            schedule: menuSchedule
+        });
 
-                // 使用 URL-Encoded 格式打包載體，完美避開 OPTIONS 跨網域預檢限制
-                const response = await fetch(GAS_API_URL, {
-                    method: 'POST',
-                    mode: 'cors', 
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: 'postData=' + encodeURIComponent(payload)
-                });
-                
-                const result = await response.json();
-                if (result && result.status === 'success') {
-                    updateSyncStatus('success', '✅ 備料排程已安全存入雲端！');
-                } else {
-                    updateSyncStatus('error', '❌ 雲端回報儲存失敗：' + (result.message || '未知錯誤'));
-                }
-            } catch (error) {
-                console.error(error);
-                updateSyncStatus('error', '❌ 儲存至雲端失敗，請確認 GAS 專案是否已發布為新版本。');
-            }
+        // ✨ 改用 text/plain 傳送乾淨的 JSON，完美避開 CORS 預檢與字元解碼錯誤問題
+        const response = await fetch(GAS_API_URL, {
+            method: 'POST',
+            mode: 'cors', 
+            headers: { 'Content-Type': 'text/plain' },
+            body: payload
+        });
+        
+        const result = await response.json();
+        if (result && result.status === 'success') {
+            updateSyncStatus('success', '✅ 備料排程已安全存入雲端！');
+        } else {
+            updateSyncStatus('error', '❌ 雲端回報儲存失敗：' + (result.message || '未知錯誤'));
         }
-
+    } catch (error) {
+        console.error(error);
+        updateSyncStatus('error', '❌ 儲存至雲端失敗，請確認 GAS 專案是否已發布為新版本並設定為「任何人」皆可存取。');
+    }
+}
         function formatDateKey(dateObj) {
             const y = dateObj.getFullYear();
             const m = String(dateObj.getMonth() + 1).padStart(2, '0');
