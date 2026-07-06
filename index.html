@@ -3,99 +3,185 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>每日烹飪排程與量化備料系統</title>
+    <title>烹飪排程與量化備料系統</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;600;700;900&family=Noto+Sans+TC:wght@400;500;600;700;900&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg-void: #FAF3E8;
+            --bg-panel: #FFFDF9;
+            --bg-panel-2: #F6EBDA;
+            --bg-inset: #FBF5EA;
+            --line: #E9DBC4;
+            --line-soft: #F1E5D2;
+            --text-hi: #4A3728;
+            --text-mid: #8A7361;
+            --text-dim: #B8A88F;
+            --cyan: #C2694A;
+            --cyan-dim: rgba(194, 105, 74, 0.12);
+            --cyan-glow: rgba(194, 105, 74, 0.28);
+            --amber: #D98E3F;
+            --amber-dim: rgba(217, 142, 63, 0.14);
+            --mint: #7C9473;
+            --mint-dim: rgba(124, 148, 115, 0.14);
+            --violet: #B07A8C;
+            --red: #C2574A;
+            --red-dim: rgba(194, 87, 74, 0.13);
+            --radius: 10px;
+            --mono: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            --serif: 'Noto Serif TC', 'Noto Sans TC', serif;
+            --sans: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+        }
+
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            font-family: var(--sans);
         }
+
+        ::selection { background: var(--cyan-glow); color: #fff; }
+
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 8px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--cyan); }
 
         body {
             display: flex;
             height: 100vh;
-            background-color: #f5f7fa;
-            color: #333;
+            background:
+                radial-gradient(ellipse 900px 500px at 15% -10%, rgba(217,142,63,0.10), transparent 60%),
+                radial-gradient(ellipse 700px 500px at 100% 10%, rgba(176,122,140,0.07), transparent 60%),
+                linear-gradient(var(--bg-void), var(--bg-void));
+            color: var(--text-hi);
         }
 
         .main-content {
             width: 75%;
             height: 100%;
-            padding: 20px;
+            padding: 24px 28px;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
+            position: relative;
         }
 
         .sidebar {
             width: 25%;
             height: 100%;
-            background-color: #fff;
-            border-left: 1px solid #e2e8f0;
-            padding: 20px;
+            background: var(--bg-panel);
+            border-left: 1px solid var(--line);
+            padding: 22px;
             display: flex;
             flex-direction: column;
-            box-shadow: -2px 0 5px rgba(0,0,0,0.02);
+            box-shadow: -20px 0 40px rgba(74,55,40,0.05);
             overflow-y: auto;
+            position: relative;
+        }
+
+        .sidebar::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 2px; height: 100%;
+            background: linear-gradient(180deg, var(--cyan), transparent 40%, transparent 60%, var(--violet));
+            opacity: 0.6;
         }
 
         header {
-            margin-bottom: 15px;
+            margin-bottom: 18px;
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: flex-end;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--line);
         }
 
         header h1 {
+            font-family: var(--serif);
             font-size: 1.5rem;
-            color: #2d3748;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+            color: var(--text-hi);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        header h1::before {
+            content: '';
+            width: 9px; height: 9px;
+            border-radius: 50%;
+            background: var(--mint);
+            box-shadow: 0 0 8px 2px var(--mint-dim), 0 0 0 3px rgba(124,148,115,0.08);
+            flex-shrink: 0;
+            animation: pulse-dot 2.4s ease-in-out infinite;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        header .hint {
+            color: var(--text-dim);
+            font-size: 0.8rem;
+            font-family: var(--sans);
         }
 
         .nav-controls {
             display: flex;
             gap: 10px;
             align-items: center;
-            margin-bottom: 15px;
+            margin-bottom: 16px;
         }
 
         .btn-nav {
-            padding: 6px 14px;
-            background-color: #fff;
-            border: 1px solid #cbd5e0;
+            padding: 7px 14px;
+            background-color: var(--bg-panel-2);
+            border: 1px solid var(--line);
             border-radius: 6px;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             cursor: pointer;
-            font-weight: bold;
-            color: #4a5568;
-            transition: all 0.2s;
+            font-weight: 600;
+            font-family: var(--mono);
+            color: var(--text-mid);
+            transition: all 0.15s ease;
         }
 
         .btn-nav:hover {
-            background-color: #edf2f7;
-            border-color: #a0aec0;
+            background-color: var(--cyan-dim);
+            border-color: var(--cyan);
+            color: var(--cyan);
         }
 
         .current-range-display {
-            font-size: 1rem;
-            font-weight: bold;
-            color: #2d3748;
+            font-size: 0.9rem;
+            font-weight: 600;
+            font-family: var(--mono);
+            color: var(--text-mid);
+            letter-spacing: 0.01em;
         }
 
         .summary-panel {
-            background-color: #ebf8ff;
-            border: 1px solid #bee3f8;
-            border-radius: 8px;
-            padding: 12px 15px;
-            margin-bottom: 15px;
+            background: linear-gradient(180deg, var(--bg-panel-2), var(--bg-panel));
+            border: 1px solid var(--line);
+            border-left: 3px solid var(--cyan);
+            border-radius: var(--radius);
+            padding: 14px 16px;
+            margin-bottom: 12px;
             display: none;
         }
 
         .summary-title {
-            font-weight: bold;
-            color: #2b6cb0;
-            margin-bottom: 8px;
-            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--cyan);
+            margin-bottom: 10px;
+            font-size: 0.85rem;
+            font-family: var(--mono);
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
         }
 
         .ingredients-list {
@@ -103,17 +189,49 @@
             flex-wrap: wrap;
             gap: 8px;
             list-style: none;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
         }
 
         .ingredient-tag {
-            background-color: #fff;
-            border: 1px solid #3182ce;
+            background-color: var(--bg-inset);
+            border: 1px solid var(--cyan);
             padding: 6px 12px;
             border-radius: 6px;
-            color: #2b6cb0;
-            font-weight: bold;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            color: var(--cyan);
+            font-weight: 600;
+            font-family: var(--mono);
+            font-size: 0.8rem;
+        }
+
+        .method-panel {
+            background: linear-gradient(180deg, var(--bg-panel-2), var(--bg-panel));
+            border: 1px solid var(--line);
+            border-left: 3px solid var(--mint);
+            border-radius: var(--radius);
+            padding: 15px 20px;
+            margin-bottom: 16px;
+            display: none;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .method-title {
+            font-weight: 700;
+            color: var(--mint);
+            font-size: 0.85rem;
+            font-family: var(--mono);
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            margin-bottom: 10px;
+            border-bottom: 1px solid var(--line-soft);
+            padding-bottom: 8px;
+        }
+
+        .method-text {
+            font-size: 0.92rem;
+            line-height: 1.7;
+            color: var(--text-mid);
+            white-space: pre-line;
         }
 
         .week-header-grid {
@@ -125,12 +243,15 @@
         }
 
         .weekday-label {
-            font-weight: bold;
-            font-size: 0.9rem;
-            color: #718096;
-            padding: 6px 0;
-            background-color: #e2e8f0;
-            border-radius: 4px;
+            font-weight: 700;
+            font-size: 0.75rem;
+            font-family: var(--mono);
+            letter-spacing: 0.08em;
+            color: var(--text-dim);
+            padding: 7px 0;
+            background-color: var(--bg-panel);
+            border: 1px solid var(--line-soft);
+            border-radius: 6px;
         }
 
         .calendar-grid {
@@ -140,89 +261,110 @@
         }
 
         .day-card {
-            background: #fff;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
+            background: var(--bg-panel);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
             padding: 10px;
             display: flex;
             flex-direction: column;
             min-height: 240px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.18s ease;
+            position: relative;
         }
 
         .day-card:hover:not(.empty) {
-            border-color: #cbd5e0;
+            border-color: var(--cyan);
+            box-shadow: 0 0 0 1px var(--cyan-glow), 0 8px 20px rgba(0,0,0,0.3);
+            transform: translateY(-1px);
         }
 
         .day-card.active-select {
-            border-color: #4299e1;
-            background-color: #f7fafc;
-            box-shadow: 0 0 0 2px #4299e1;
+            border-color: var(--cyan);
+            background-color: var(--bg-panel-2);
+            box-shadow: 0 0 0 1px var(--cyan), 0 0 16px var(--cyan-glow);
         }
 
         .day-card.empty {
-            background-color: #edf2f7;
-            border: 1px dashed #cbd5e0;
-            opacity: 0.6;
+            background-color: var(--bg-inset);
+            border: 1px dashed var(--line);
+            opacity: 0.5;
             cursor: default;
         }
 
         .day-card.today {
-            background-color: #fffaf0;
-            border-color: #dd6b20;
+            background-color: rgba(255, 159, 67, 0.05);
+            border-color: var(--amber);
+        }
+
+        .day-card.today::before {
+            content: '';
+            position: absolute;
+            top: -1px; left: -1px; right: -1px; bottom: -1px;
+            border-radius: var(--radius);
+            box-shadow: 0 0 14px rgba(255,159,67,0.25);
+            pointer-events: none;
         }
 
         .day-title {
-            font-weight: bold;
-            font-size: 0.9rem;
-            color: #2d3748;
+            font-weight: 700;
+            font-size: 0.85rem;
+            font-family: var(--mono);
+            color: var(--text-hi);
             margin-bottom: 8px;
-            border-bottom: 1px solid #edf2f7;
-            padding-bottom: 4px;
+            border-bottom: 1px solid var(--line-soft);
+            padding-bottom: 6px;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
 
         .day-title .badge {
-            font-size: 0.75rem;
-            background-color: #dd6b20;
-            color: white;
-            padding: 1px 5px;
+            font-size: 0.65rem;
+            font-family: var(--mono);
+            font-weight: 700;
+            background-color: var(--amber);
+            color: #1a1206;
+            padding: 2px 6px;
             border-radius: 3px;
+            letter-spacing: 0.02em;
         }
 
         .meal-slot {
             margin-bottom: 5px;
-            padding: 4px;
-            background-color: #f7fafc;
-            border: 1px dashed #cbd5e0;
-            border-radius: 4px;
+            padding: 5px 6px;
+            background-color: var(--bg-inset);
+            border: 1px dashed var(--line);
+            border-radius: 5px;
             min-height: 38px;
-            transition: background-color 0.2s;
+            transition: all 0.15s ease;
         }
 
         .meal-slot.drag-over {
-            background-color: #feebc8;
-            border-color: #dd6b20;
+            background-color: var(--cyan-dim);
+            border-color: var(--cyan);
+            border-style: solid;
         }
 
         .meal-slot-title {
-            font-size: 0.65rem;
-            color: #a0aec0;
-            font-weight: 600;
-            margin-bottom: 2px;
+            font-size: 0.62rem;
+            font-family: var(--mono);
+            color: var(--text-dim);
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            margin-bottom: 3px;
         }
 
         .placed-dish {
-            background-color: #3182ce;
-            color: white;
-            padding: 2px 6px;
-            border-radius: 3px;
+            background-color: var(--cyan-dim);
+            border: 1px solid var(--cyan);
+            color: var(--cyan);
+            padding: 5px 8px;
+            border-radius: 4px;
             font-size: 0.75rem;
-            margin-bottom: 2px;
+            font-weight: 600;
+            margin-bottom: 3px;
             cursor: grab;
             display: flex;
             justify-content: space-between;
@@ -234,75 +376,152 @@
             font-weight: bold;
             margin-left: 4px;
             padding: 0 2px;
-            opacity: 0.7;
+            opacity: 0.6;
+            color: var(--red);
         }
 
         .placed-dish .remove-btn:hover {
             opacity: 1;
-            color: #fed7d7;
+        }
+
+        .placed-dish .dish-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            cursor: pointer;
         }
 
         .section-title {
-            font-size: 1.1rem;
-            font-weight: bold;
-            color: #2d3748;
-            margin-bottom: 12px;
-            margin-top: 15px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            font-family: var(--mono);
+            color: var(--text-hi);
+            margin-bottom: 14px;
+            margin-top: 20px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--line);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .section-title::before {
+            content: '';
+            width: 3px;
+            height: 14px;
+            background: var(--violet);
+            border-radius: 2px;
+            flex-shrink: 0;
         }
 
         .section-title:first-child {
             margin-top: 0;
         }
 
+        .search-box {
+            position: relative;
+            margin-bottom: 10px;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 8px 10px 8px 30px;
+            background-color: var(--bg-inset);
+            border: 1px solid var(--line);
+            border-radius: 20px;
+            font-size: 0.85rem;
+            color: var(--text-hi);
+            transition: border-color 0.15s ease;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--cyan);
+        }
+
+        .search-box input::placeholder {
+            color: var(--text-dim);
+        }
+
+        .search-box::before {
+            content: '🔍';
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 0.8rem;
+            opacity: 0.6;
+        }
+
+        .dish-list-empty {
+            text-align: center;
+            color: var(--text-dim);
+            font-size: 0.85rem;
+            padding: 20px 10px;
+        }
+
         .category-tabs {
             display: flex;
-            gap: 4px;
+            gap: 6px;
             margin-bottom: 12px;
             flex-wrap: wrap;
         }
 
         .tab {
-            padding: 4px 10px;
-            background-color: #edf2f7;
+            padding: 5px 12px;
+            background-color: var(--bg-inset);
+            border: 1px solid var(--line);
             border-radius: 20px;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
+            font-family: var(--mono);
+            font-weight: 600;
             cursor: pointer;
-            border: none;
-            color: #4a5568;
+            color: var(--text-mid);
+            transition: all 0.15s ease;
+        }
+
+        .tab:hover {
+            border-color: var(--cyan);
+            color: var(--cyan);
         }
 
         .tab.active {
-            background-color: #3182ce;
-            color: white;
+            background-color: var(--cyan);
+            border-color: var(--cyan);
+            color: #06222b;
         }
 
         .dish-list {
             height: 220px;
             overflow-y: auto;
-            border: 1px solid #edf2f7;
-            border-radius: 6px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
             padding: 8px;
-            background-color: #f7fafc;
+            background-color: var(--bg-inset);
             margin-bottom: 15px;
         }
 
         .dish-item {
-            background-color: #fff;
-            padding: 8px 10px;
+            background-color: var(--bg-panel-2);
+            padding: 9px 10px;
             margin-bottom: 6px;
             border-radius: 6px;
-            border: 1px solid #e2e8f0;
+            border: 1px solid var(--line);
+            border-left: 2px solid var(--violet);
             cursor: grab;
             font-size: 0.85rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            color: var(--text-hi);
             display: flex;
             justify-content: space-between;
             align-items: center;
+            transition: all 0.15s ease;
         }
 
         .dish-item:hover {
-            border-color: #3182ce;
-            background-color: #ebf8ff;
+            border-color: var(--cyan);
+            border-left-color: var(--cyan);
+            background-color: var(--cyan-dim);
         }
 
         .dish-item .action-icons {
@@ -312,65 +531,58 @@
 
         .dish-item .action-btn {
             cursor: pointer;
-            color: #a0aec0;
+            color: var(--text-dim);
             font-size: 0.85rem;
             padding: 2px 4px;
             transition: color 0.2s;
         }
 
         .dish-item .action-btn.edit:hover {
-            color: #3182ce;
+            color: var(--cyan);
         }
 
         .dish-item .action-btn.delete:hover {
-            color: #e53e3e;
-        }
-
-        .method-panel {
-            background-color: #f0fff4;
-            border: 1px solid #c6f6d5;
-            border-radius: 6px;
-            padding: 12px;
-            margin-bottom: 15px;
-            display: none;
-        }
-
-        .method-title {
-            font-weight: bold;
-            color: #22543d;
-            font-size: 0.9rem;
-            margin-bottom: 4px;
-        }
-
-        .method-text {
-            font-size: 0.85rem;
-            color: #2f855a;
-            white-space: pre-line;
+            color: var(--red);
         }
 
         .add-dish-form {
-            border-top: 1px solid #e2e8f0;
-            padding-top: 15px;
+            border-top: 1px solid var(--line);
+            padding-top: 8px;
         }
 
         .form-group {
-            margin-bottom: 10px;
+            margin-bottom: 12px;
         }
 
         .form-group label {
             display: block;
-            font-size: 0.8rem;
-            color: #4a5568;
-            margin-bottom: 4px;
-            font-weight: bold;
+            font-size: 0.75rem;
+            font-family: var(--mono);
+            color: var(--text-mid);
+            margin-bottom: 5px;
+            font-weight: 700;
+            letter-spacing: 0.02em;
         }
 
-        .form-group input[type="text"], .form-group textarea {
+        .form-group input[type="text"], .form-group input[type="number"], .form-group textarea {
             width: 100%;
-            padding: 8px;
-            border: 1px solid #cbd5e0;
-            border-radius: 4px;
-            font-size: 0.9rem;
+            padding: 8px 10px;
+            background-color: var(--bg-inset);
+            border: 1px solid var(--line);
+            border-radius: 5px;
+            font-size: 0.88rem;
+            color: var(--text-hi);
+            transition: border-color 0.15s ease;
+        }
+
+        .form-group input:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: var(--cyan);
+            box-shadow: 0 0 0 1px var(--cyan);
+        }
+
+        .form-group input::placeholder, .form-group textarea::placeholder {
+            color: var(--text-dim);
         }
 
         .checkbox-grid {
@@ -380,41 +592,55 @@
         }
 
         .checkbox-label {
-            font-size: 0.8rem;
+            font-size: 0.78rem;
+            color: var(--text-mid);
             display: flex;
             align-items: center;
-            gap: 4px;
+            gap: 5px;
+        }
+
+        .checkbox-label input[type="checkbox"] {
+            accent-color: var(--cyan);
         }
 
         .btn-submit {
             width: 100%;
-            padding: 10px;
-            background-color: #48bb78;
-            color: white;
+            padding: 11px;
+            background: linear-gradient(180deg, var(--mint), #22b385);
+            color: #06231a;
             border: none;
-            border-radius: 4px;
-            font-weight: bold;
+            border-radius: 6px;
+            font-weight: 700;
+            font-family: var(--mono);
+            letter-spacing: 0.02em;
             cursor: pointer;
+            transition: filter 0.15s ease;
         }
 
         .btn-submit:hover {
-            background-color: #38a169;
+            filter: brightness(1.1);
         }
 
         .btn-cancel {
             width: 100%;
-            padding: 6px;
-            background-color: #e2e8f0;
-            color: #4a5568;
-            border: none;
-            border-radius: 4px;
+            padding: 7px;
+            background-color: transparent;
+            color: var(--text-dim);
+            border: 1px solid var(--line);
+            border-radius: 6px;
             font-size: 0.8rem;
-            margin-top: 5px;
+            font-family: var(--mono);
+            margin-top: 6px;
             cursor: pointer;
             display: none;
+            transition: all 0.15s ease;
         }
 
-        /* ✨ 新增：食材動態輸入列樣式 */
+        .btn-cancel:hover {
+            border-color: var(--red);
+            color: var(--red);
+        }
+
         .ingredient-edit-row {
             display: flex;
             gap: 4px;
@@ -423,9 +649,15 @@
         }
         .ingredient-edit-row input {
             padding: 6px 8px !important;
-            border: 1px solid #cbd5e0;
+            background-color: var(--bg-inset);
+            border: 1px solid var(--line);
             border-radius: 4px;
             font-size: 0.85rem !important;
+            color: var(--text-hi);
+        }
+        .ingredient-edit-row input:focus {
+            outline: none;
+            border-color: var(--cyan);
         }
         .ing-name { flex: 2; width: 0; }
         .ing-qty { flex: 1; width: 0; }
@@ -433,15 +665,68 @@
         .ing-del-btn {
             background: none;
             border: none;
-            color: #e53e3e;
+            color: var(--red);
             cursor: pointer;
             font-size: 1.2rem;
             padding: 0 4px;
             line-height: 1;
             font-weight: bold;
+            opacity: 0.7;
         }
         .ing-del-btn:hover {
-            color: #c53030;
+            opacity: 1;
+        }
+
+        @media (max-width: 900px) {
+            body {
+                flex-direction: column;
+                height: auto;
+                min-height: 100vh;
+            }
+            .main-content, .sidebar {
+                width: 100%;
+                height: auto;
+            }
+            .sidebar {
+                border-left: none;
+                border-top: 1px solid var(--line);
+                box-shadow: none;
+            }
+            .sidebar::before {
+                top: 0; left: 0;
+                width: 100%; height: 2px;
+                background: linear-gradient(90deg, var(--cyan), transparent 40%, transparent 60%, var(--violet));
+            }
+            .dish-list { height: 240px; }
+        }
+
+        @media (max-width: 640px) {
+            .main-content { padding: 16px; }
+            .sidebar { padding: 16px; }
+            header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 6px;
+            }
+            .nav-controls {
+                flex-wrap: wrap;
+            }
+            .week-header-grid { display: none; }
+            .calendar-grid {
+                grid-template-columns: 1fr;
+            }
+            .day-card { min-height: auto; }
+            .checkbox-grid { grid-template-columns: repeat(2, 1fr); }
+            .day-title .weekday-tag {
+                display: inline;
+            }
+        }
+
+        .day-title .weekday-tag {
+            display: none;
+            color: var(--text-dim);
+            font-weight: 600;
+            margin-left: 4px;
         }
     </style>
 </head>
@@ -449,8 +734,8 @@
 
     <div class="main-content">
         <header>
-            <h1>烹飪排程與量化備料系統</h1>
-            <span style="color: #718096; font-size: 0.85rem;">提示：直接拖曳菜色到排程中，系統會自動同步至雲端。</span>
+            <h1>🍚 我家的烹飪排程與備料清單</h1>
+            <span class="hint">拖曳菜色到排程格，會自動同步到雲端喔</span>
         </header>
 
         <div class="nav-controls">
@@ -465,6 +750,11 @@
             <ul class="ingredients-list" id="ingredientsList"></ul>
         </div>
         
+        <div class="method-panel" id="methodPanel">
+            <div class="method-title" id="methodDishName">菜色名稱</div>
+            <div class="method-text" id="methodContent">烹飪手法說明...</div>
+        </div>
+        
         <div class="week-header-grid">
             <div class="weekday-label">週一</div><div class="weekday-label">週二</div><div class="weekday-label">週三</div>
             <div class="weekday-label">週四</div><div class="weekday-label">週五</div><div class="weekday-label">週六</div>
@@ -475,13 +765,12 @@
     </div>
 
     <div class="sidebar">
-        <div class="method-panel" id="methodPanel">
-            <div class="method-title" id="methodDishName">菜色名稱</div>
-            <div class="method-text" id="methodContent">烹飪手法說明...</div>
+        <div class="section-title">我的菜色庫</div>
+
+        <div class="search-box">
+            <input type="text" id="dishSearchInput" placeholder="搜尋菜色名稱..." oninput="handleDishSearch(this.value)">
         </div>
 
-        <div class="section-title">我的菜色庫</div>
-        
         <div class="category-tabs" id="categoryTabs">
             <button class="tab active" onclick="filterDishes('全部', this)">全部</button>
             <button class="tab" onclick="filterDishes('早餐', this)">早餐</button>
@@ -512,10 +801,9 @@
                 </div>
             </div>
             
-            <!-- ✨ 修改：改為結構化食材單獨輸入面板 -->
             <div class="form-group">
                 <label style="margin-bottom: 6px;">所需材料與量化</label>
-                <div style="display: flex; gap: 4px; font-size: 0.75rem; color: #718096; font-weight: bold; margin-bottom: 4px; padding-left: 2px;">
+                <div style="display: flex; gap: 4px; font-size: 0.75rem; color: var(--text-mid); font-weight: bold; margin-bottom: 4px; padding-left: 2px;">
                     <span style="flex: 2;">種類品項</span>
                     <span style="flex: 1;">數量</span>
                     <span style="flex: 1;">單位</span>
@@ -535,31 +823,45 @@
     </div>
 
     <script>
-        // ⚠️ 請記得將下方網址替換為你在 GAS 重新部署後取得的最新「網頁應用程式 URL」
         const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxDiEtSRBnpNvSxCA6Ff-dEtBvm_dKkwNvKoGggD1AxuLXYmAtwS-yhd7z-jxYVGa6R/exec";
 
         let dishDatabase = [];
         let menuSchedule = {};
         let currentFilter = '全部';
+        let searchQuery = '';
         let selectedDateKey = null;
         
         let calendarAnchorDate = new Date();
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = String(str ?? '');
+            return div.innerHTML;
+        }
+
+        // 修改此處：相容新型 "dishId:倍率"、舊型純數字/字串格式及物件格式，皆只解析並回傳純 dishId 數字
+        function getPlacementId(entry) {
+            if (!entry) return null;
+            if (typeof entry === 'object') return entry.id;
+            const str = String(entry);
+            return parseInt(str.split(':')[0], 10);
+        }
 
         function updateSyncStatus(status, text) {
             let bar = document.getElementById('syncStatusBar');
             if (!bar) {
                 bar = document.createElement('div');
                 bar.id = 'syncStatusBar';
-                bar.style = "position: fixed; top: 0; left: 0; width: 100%; text-align: center; font-size: 0.8rem; padding: 4px; z-index: 9999; font-weight: bold;";
+                bar.style = "position: fixed; top: 0; left: 0; width: 100%; text-align: center; font-size: 0.8rem; padding: 6px; z-index: 9999; font-weight: 700; font-family: 'Noto Sans TC', sans-serif; letter-spacing: 0.02em;";
                 document.body.appendChild(bar);
             }
             if (status === 'loading') {
-                bar.style.backgroundColor = '#feebc8'; bar.style.color = '#dd6b20'; bar.innerText = text || '⏳ 雲端資料同步中...';
+                bar.style.backgroundColor = 'rgba(217,142,63,0.16)'; bar.style.color = '#9c5f22'; bar.style.borderBottom = '1px solid rgba(217,142,63,0.4)'; bar.innerText = text || '⏳ 雲端資料同步中...';
             } else if (status === 'success') {
-                bar.style.backgroundColor = '#c6f6d5'; bar.style.color = '#22543d'; bar.innerText = text || '✅ 雲端同步成功';
+                bar.style.backgroundColor = 'rgba(124,148,115,0.18)'; bar.style.color = '#4f6b46'; bar.style.borderBottom = '1px solid rgba(124,148,115,0.4)'; bar.innerText = text || '✅ 雲端同步成功';
                 setTimeout(() => bar.style.display = 'none', 2000);
             } else if (status === 'error') {
-                bar.style.backgroundColor = '#fed7d7'; bar.style.color = '#9b2c2c'; bar.innerText = text || '❌ 同步失敗';
+                bar.style.backgroundColor = 'rgba(194,87,74,0.16)'; bar.style.color = '#9c3d31'; bar.style.borderBottom = '1px solid rgba(194,87,74,0.4)'; bar.innerText = text || '❌ 同步失敗';
             }
             bar.style.display = 'block';
         }
@@ -631,31 +933,33 @@
 
         function getScheduleData(dateKey, legacyKey) {
             if (menuSchedule[dateKey]) return menuSchedule[dateKey];
-            if (menuSchedule[legacyKey]) {
+            if (legacyKey && menuSchedule[legacyKey]) {
                 menuSchedule[dateKey] = menuSchedule[legacyKey];
                 return menuSchedule[dateKey];
             }
             return null;
         }
 
-        function parseAndAggregateIngredients(ingredientsArray) {
+        function parseAndAggregateIngredients(ingredientLists) {
             let totals = {};
-            ingredientsArray.forEach(str => {
-                if (!str) return;
-                const match = str.match(/^([^\d\s\.]+)([\d\.]+)?(.*)$/);
-                if (match) {
-                    const name = match[1].trim();
-                    const value = match[2] ? parseFloat(match[2]) : null;
-                    const unit = match[3] ? match[3].trim() : '';
+            ingredientLists.forEach(ingredients => {
+                (ingredients || []).forEach(str => {
+                    if (!str) return;
+                    const match = str.match(/^([^\d\s\.]+)([\d\.]+)?(.*)$/);
+                    if (match) {
+                        const name = match[1].trim();
+                        const value = match[2] ? parseFloat(match[2]) : null;
+                        const unit = match[3] ? match[3].trim() : '';
 
-                    if (value !== null) {
-                        if (!totals[name]) totals[name] = { value: 0, unit: unit };
-                        totals[name].value += value;
-                        if(unit) totals[name].unit = unit; 
-                    } else {
-                        if (!totals[name]) totals[name] = { value: null, unit: unit };
+                        if (value !== null) {
+                            if (!totals[name]) totals[name] = { value: 0, unit: unit };
+                            totals[name].value += value;
+                            if(unit) totals[name].unit = unit; 
+                        } else {
+                            if (!totals[name]) totals[name] = { value: null, unit: unit };
+                        }
                     }
-                }
+                });
             });
 
             let resultStrings = [];
@@ -680,17 +984,18 @@
             listContainer.innerHTML = '';
 
             const dayMeals = getScheduleData(dateKey, legacyKey);
-            let allIngredients = [];
+            let ingredientLists = [];
             let hasFood = false;
 
             if (dayMeals) {
                 ['早餐', '中餐', '晚餐', '宵夜', '點心'].forEach(mealType => {
                     if (dayMeals[mealType] && dayMeals[mealType].length > 0) {
                         hasFood = true;
-                        dayMeals[mealType].forEach(dishId => {
+                        dayMeals[mealType].forEach(entry => {
+                            const dishId = getPlacementId(entry);
                             const dish = dishDatabase.find(d => d.id === dishId);
                             if (dish && dish.ingredients) {
-                                allIngredients = allIngredients.concat(dish.ingredients);
+                                ingredientLists.push(dish.ingredients);
                             }
                         });
                     }
@@ -698,15 +1003,15 @@
             }
 
             if (!hasFood) {
-                listContainer.innerHTML = '<li>今天此日無排餐，無需備料！</li>';
+                listContainer.innerHTML = '<li style="color: var(--text-dim); list-style: none; font-size: 0.85rem;">今天此日無排餐，無需備料</li>';
                 panel.style.display = 'block';
                 return;
             }
 
-            let aggregatedIngredients = parseAndAggregateIngredients(allIngredients);
+            let aggregatedIngredients = parseAndAggregateIngredients(ingredientLists);
 
             if(aggregatedIngredients.length === 0) {
-                listContainer.innerHTML = '<li>所選菜色未設定材料。</li>';
+                listContainer.innerHTML = '<li style="color: var(--text-dim); list-style: none; font-size: 0.85rem;">所選菜色未設定材料</li>';
             } else {
                 aggregatedIngredients.forEach(ing => {
                     const li = document.createElement('li');
@@ -718,17 +1023,71 @@
             panel.style.display = 'block';
         }
 
+        function showDayCookingMethods(dateKey, legacyKey) {
+            const dayMeals = getScheduleData(dateKey, legacyKey);
+            const methodPanel = document.getElementById('methodPanel');
+            const methodDishName = document.getElementById('methodDishName');
+            const methodContent = document.getElementById('methodContent');
+            
+            if (!dayMeals) {
+                methodPanel.style.display = 'none';
+                return;
+            }
+            
+            let bookedDishesMap = {};
+            ['早餐', '中餐', '晚餐', '宵夜', '點心'].forEach(mealType => {
+                if (dayMeals[mealType] && dayMeals[mealType].length > 0) {
+                    dayMeals[mealType].forEach(entry => {
+                        const dishId = getPlacementId(entry);
+                        const dish = dishDatabase.find(d => d.id === dishId);
+                        if (dish) {
+                            if (!bookedDishesMap[dishId]) {
+                                bookedDishesMap[dishId] = dish;
+                            }
+                        }
+                    });
+                }
+            });
+            
+            const bookedDishes = Object.values(bookedDishesMap);
+
+            if (bookedDishes.length === 0) {
+                methodPanel.style.display = 'none';
+                return;
+            }
+            
+            methodPanel.style.display = 'block';
+            const displayDate = dateKey.substring(5).replace('-', '/');
+            methodDishName.innerText = `🍳 ${displayDate} 今日菜單做法彙整`;
+            
+            let fullMethodText = "";
+            bookedDishes.forEach(dish => {
+                fullMethodText += `【${dish.name}】\n材料：${dish.ingredients.join('、')}\n做法：${dish.method || "暫無說明。"}\n\n`;
+            });
+            
+            methodContent.innerText = fullMethodText.trim();
+        }
+
         function renderDishList() {
             const container = document.getElementById('dishList');
             container.innerHTML = '';
-            const filtered = dishDatabase.filter(d => currentFilter === '全部' || d.tags.includes(currentFilter));
+            const filtered = dishDatabase.filter(d => {
+                const matchTag = currentFilter === '全部' || d.tags.includes(currentFilter);
+                const matchSearch = searchQuery === '' || d.name.toLowerCase().includes(searchQuery);
+                return matchTag && matchSearch;
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML = `<div class="dish-list-empty">${searchQuery ? `😶 找不到含「${escapeHtml(searchQuery)}」的菜色` : '尚無菜色，新增一道吧！'}</div>`;
+                return;
+            }
 
             filtered.forEach(dish => {
                 const item = document.createElement('div');
                 item.className = 'dish-item';
                 item.setAttribute('draggable', 'true');
                 item.innerHTML = `
-                    <span onclick="showCookingMethod(${dish.id})" style="flex-grow: 1; cursor: pointer;">${dish.name}</span>
+                    <span onclick="showCookingMethod(${dish.id})" style="flex-grow: 1; cursor: pointer;">${escapeHtml(dish.name)}</span>
                     <div class="action-icons">
                         <span class="action-btn edit" onclick="editDish(${dish.id})" title="編輯">✏️</span>
                         <span class="action-btn delete" onclick="deleteDishFromDatabase(${dish.id})" title="刪除">🗑️</span>
@@ -737,6 +1096,11 @@
                 item.ondragstart = (e) => { e.dataTransfer.setData('text/plain', dish.id); };
                 container.appendChild(item);
             });
+        }
+
+        function handleDishSearch(value) {
+            searchQuery = value.trim().toLowerCase();
+            renderDishList();
         }
 
         async function deleteDishFromDatabase(id) {
@@ -749,7 +1113,7 @@
                 for (let dateKey in menuSchedule) {
                     for (let mealType in menuSchedule[dateKey]) {
                         if (Array.isArray(menuSchedule[dateKey][mealType])) {
-                            menuSchedule[dateKey][mealType] = menuSchedule[dateKey][mealType].filter(dishId => dishId !== id);
+                            menuSchedule[dateKey][mealType] = menuSchedule[dateKey][mealType].filter(entry => getPlacementId(entry) !== id);
                         }
                     }
                 }
@@ -762,7 +1126,10 @@
 
                 renderDishList();
                 renderCalendar();
-                if (selectedDateKey) updateIngredientsSummary(selectedDateKey);
+                if (selectedDateKey) {
+                    updateIngredientsSummary(selectedDateKey);
+                    showDayCookingMethods(selectedDateKey);
+                }
                 
                 await saveCloudData();
             }
@@ -783,7 +1150,6 @@
             document.getElementById('methodContent').innerText = `【材料】\n${dish.ingredients.join('\n')}\n\n【做法】\n${dish.method || "暫無說明。"}`;
         }
 
-        /* ✨ 新增：動態生成一列食材輸入框的函式 */
         function addIngredientRow(name = "", qty = "", unit = "") {
             const container = document.getElementById('ingredientRowContainer');
             const row = document.createElement('div');
@@ -797,7 +1163,6 @@
             container.appendChild(row);
         }
 
-        /* ✨ 修改：讀取菜色準備編輯時，自動拆解文字填入結構化輸入框 */
         function editDish(id) {
             const dish = dishDatabase.find(d => d.id === id);
             if (!dish) return;
@@ -806,7 +1171,6 @@
             document.getElementById('editDishId').value = dish.id;
             document.getElementById('dishName').value = dish.name;
             
-            // 填入結構化食材欄位
             const container = document.getElementById('ingredientRowContainer');
             container.innerHTML = "";
             if (dish.ingredients && dish.ingredients.length > 0) {
@@ -835,7 +1199,6 @@
             document.getElementById('btnCancel').style.display = "block";
         }
 
-        /* ✨ 修改：儲存菜色時，自動抓取所有獨立欄位並拼湊回相容的文字格式送出 */
         async function saveDish() {
             const idVal = document.getElementById('editDishId').value;
             const name = document.getElementById('dishName').value.trim();
@@ -847,7 +1210,6 @@
 
             if (!name) { alert('請輸入菜色名稱！'); return; }
 
-            // 收集結構化欄位資料並還原為系統拼裝格式
             const rows = document.querySelectorAll('.ingredient-edit-row');
             let ingredients = [];
             rows.forEach(row => {
@@ -856,7 +1218,6 @@
                 const ingUnit = row.querySelector('.ing-unit').value.trim();
                 
                 if (ingName) {
-                    // 自動黏合為 "品項數量單位" (例如: 蛋 + 1 + 顆 -> 蛋1顆)，相容舊資料
                     const combined = `${ingName}${ingQty}${ingUnit}`;
                     ingredients.push(combined);
                 }
@@ -874,20 +1235,21 @@
             clearForm();
             renderDishList();
             renderCalendar();
-            if (selectedDateKey) updateIngredientsSummary(selectedDateKey);
+            if (selectedDateKey) {
+                updateIngredientsSummary(selectedDateKey);
+                showDayCookingMethods(selectedDateKey);
+            }
             
             await saveCloudData();
         }
 
-        /* ✨ 修改：清空表單時同時清空食材面板並留下一列空白輸入列 */
         function clearForm() {
             document.getElementById('formTitle').innerText = "新增自訂菜色";
             document.getElementById('editDishId').value = "";
             document.getElementById('dishName').value = "";
             
-            // 重設食材區域
             document.getElementById('ingredientRowContainer').innerHTML = "";
-            addIngredientRow(); // 預設留一列空白供輸入
+            addIngredientRow(); 
             
             document.getElementById('dishMethod').value = "";
             document.querySelectorAll('input[name="tags"]').forEach(cb => cb.checked = false);
@@ -910,7 +1272,10 @@
             selectedDateKey = formatDateKey(today);
             renderCalendar();
             updateIngredientsSummary(selectedDateKey, `${today.getMonth()+1}/${today.getDate()}`);
+            showDayCookingMethods(selectedDateKey, `${today.getMonth()+1}/${today.getDate()}`);
         }
+
+        const WEEKDAY_NAMES = ['日', '一', '二', '三', '四', '五', '六'];
 
         function renderCalendar() {
             const grid = document.getElementById('calendarGrid');
@@ -947,10 +1312,11 @@
                     document.querySelectorAll('.day-card').forEach(c => c.classList.remove('active-select'));
                     card.classList.add('active-select');
                     updateIngredientsSummary(dateKey, legacyKey);
+                    showDayCookingMethods(dateKey, legacyKey);
                 };
 
                 let todayBadge = dateKey === todayStr ? '<span class="badge">今天</span>' : '';
-                card.innerHTML = `<div class="day-title"><span>${targetDate.getMonth()+1}/${targetDate.getDate()}</span>${todayBadge}</div>`;
+                card.innerHTML = `<div class="day-title"><span>${targetDate.getMonth()+1}/${targetDate.getDate()}<span class="weekday-tag">(${WEEKDAY_NAMES[targetDate.getDay()]})</span></span>${todayBadge}</div>`;
                 
                 if (!menuSchedule[dateKey]) {
                     if(menuSchedule[legacyKey]) {
@@ -967,27 +1333,33 @@
                     
                     slot.ondragover = (e) => { e.preventDefault(); slot.classList.add('drag-over'); };
                     slot.ondragleave = () => slot.classList.remove('drag-over');
+                    
+                    // 修改此處：拖曳加入新菜色時，直接存入純 dishId
                     slot.ondrop = async (e) => {
                         e.preventDefault();
                         slot.classList.remove('drag-over');
                         const dishId = parseInt(e.dataTransfer.getData('text/plain'));
                         
-                        if (!menuSchedule[dateKey][mealType].includes(dishId)) {
+                        if (!menuSchedule[dateKey][mealType].some(entry => getPlacementId(entry) === dishId)) {
                             menuSchedule[dateKey][mealType].push(dishId);
                             renderCalendar();
-                            if (dateKey === selectedDateKey) updateIngredientsSummary(dateKey, legacyKey);
+                            if (dateKey === selectedDateKey) {
+                                updateIngredientsSummary(dateKey, legacyKey);
+                                showDayCookingMethods(dateKey, legacyKey);
+                            }
                             await saveCloudData(); 
                         }
                     };
 
-                    const dishIds = menuSchedule[dateKey][mealType] || [];
-                    dishIds.forEach(dishId => {
+                    const placedEntries = menuSchedule[dateKey][mealType] || [];
+                    placedEntries.forEach(entry => {
+                        const dishId = getPlacementId(entry);
                         const dish = dishDatabase.find(d => d.id === dishId);
                         if (dish) {
                             const dishEl = document.createElement('div');
                             dishEl.className = 'placed-dish';
                             dishEl.innerHTML = `
-                                <span onclick="event.stopPropagation(); showCookingMethod(${dish.id})">${dish.name}</span>
+                                <span class="dish-name" onclick="event.stopPropagation(); showCookingMethod(${dish.id})" title="${escapeHtml(dish.name)}">${escapeHtml(dish.name)}</span>
                                 <span class="remove-btn" onclick="event.stopPropagation(); removeDishFromSchedule('${dateKey}', '${mealType}', ${dish.id})">×</span>
                             `;
                             slot.appendChild(dishEl);
@@ -1001,16 +1373,20 @@
 
         async function removeDishFromSchedule(dateKey, mealType, dishId) {
             if(menuSchedule[dateKey] && menuSchedule[dateKey][mealType]) {
-                menuSchedule[dateKey][mealType] = menuSchedule[dateKey][mealType].filter(id => id !== dishId);
+                menuSchedule[dateKey][mealType] = menuSchedule[dateKey][mealType].filter(entry => getPlacementId(entry) !== dishId);
                 renderCalendar();
-                if (dateKey === selectedDateKey) updateIngredientsSummary(dateKey, `${parseInt(dateKey.split('-')[1])}/${parseInt(dateKey.split('-')[2])}`);
+                if (dateKey === selectedDateKey) {
+                    const legacyKey = `${parseInt(dateKey.split('-')[1])}/${parseInt(dateKey.split('-')[2])}`;
+                    updateIngredientsSummary(dateKey, legacyKey);
+                    showDayCookingMethods(dateKey, legacyKey);
+                }
                 await saveCloudData(); 
             }
         }
 
         window.onload = () => {
             loadCloudData();
-            clearForm(); // 確保初次載入時表單初始化，出現一筆空白食材框
+            clearForm(); 
         };
     </script>
 </body>
